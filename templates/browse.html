@@ -1,45 +1,34 @@
-<!-- browse.html -->
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>All Vectors</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
-            integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q"
-            crossorigin="anonymous"></script>
-</head>
-<body class="bg-light">
-<div class="container mt-5">
-    <h1 class="mb-4">All Stored Vectors</h1>
+{% extends "base.html" %}
 
-    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-        <table class="table table-bordered table-hover table-sm align-middle">
-            <thead class="table-light sticky-top">
-            <tr>
-                <th>ID</th>
-                <th>Document</th>
-                <th>Metadata</th>
-                <th>Embedding (truncated)</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for vector in vectors %}
-            <tr>
-                <td>{{ vector.id }}</td>
-                <td>{{ vector.document or "—" }}</td>
-                <td>
-                    <pre class="mb-0">{{ vector.metadata | tojson(indent=0) }}</pre>
-                </td>
-                <td><code>{{ vector.embedding[:10] }}...</code></td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
+{% block title %}All Vectors{% endblock %}
 
-    <a href="/" class="btn btn-secondary mt-4">Back</a>
+{% block content %}
+<h1 class="mb-4">All Stored Vectors</h1>
+
+<div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+    <table class="table table-bordered table-hover table-sm align-middle">
+        <thead class="table-light sticky-top">
+        <tr>
+            <th>ID</th>
+            <th>Document</th>
+            <th>Metadata</th>
+            <th>Embedding (truncated)</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for vector in vectors %}
+        <tr>
+            <td>{{ vector.id }}</td>
+            <td>{{ vector.document or "—" }}</td>
+            <td>
+                <pre class="mb-0">{{ vector.metadata | tojson(indent=0) }}</pre>
+            </td>
+            <td><code>{{ vector.embedding[:10] }}...</code></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
 </div>
-</body>
-</html>
+
+<a href="/" class="btn btn-secondary mt-4">Back</a>
+{% endblock %}

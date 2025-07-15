@@ -16,8 +16,18 @@ collection = chroma_client.get_or_create_collection("heterogeneous_vectors")
 
 @app.route('/', methods=['GET'])
 async def index():
-    return await render_template("index.html", results=None)
+    collections = chroma_client.list_collections()
+    collection_names = [col.name for col in collections]
+    return await render_template("index.html", results=None, collections=collection_names, current_collection=collection.name)
 
+@app.route('/set-collection', methods=['POST'])
+async def set_collection():
+    form = await request.form
+    selected_name = form.get('collection_name')
+    global collection  # so it updates the top-level variable
+    collection = chroma_client.get_or_create_collection(name=selected_name)
+    await flash(f"Switched to collection: {selected_name}", "success")
+    return redirect(url_for('index'))
 
 @app.route('/add-vector', methods=['POST'])
 async def add_vector():
