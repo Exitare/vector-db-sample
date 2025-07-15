@@ -101,7 +101,7 @@ async def upload_data():
 
             with h5py.File(filepath, 'r') as f:
                 # Assuming datasets are stored as arrays: /submitter_ids, /X, /y
-                ids = [str(x) for x in f['submitter_ids'][()]]
+                ids = [str(x.decode('utf-8')) for x in f['submitter_ids'][()]]
                 embeddings = f['X'][()].tolist()
                 y_values = f['y'][()]
                 if hasattr(y_values, "tolist"):  # numpy array
@@ -131,6 +131,27 @@ async def upload_data():
 
     return redirect(url_for('index'))
 
+
+@app.route('/browse-vectors')
+async def browse_vectors():
+    try:
+        # Fetch all vectors from your Chroma collection
+        results = collection.get(include=["embeddings", "metadatas", "documents"])
+
+        vectors = []
+        for i in range(len(results['ids'])):
+            vectors.append({
+                'id': results['ids'][i],
+                'embedding': results['embeddings'][i],
+                'metadata': results['metadatas'][i] if results['metadatas'] else None,
+                'document': results['documents'][i] if results['documents'] else None
+            })
+
+        return await render_template('browse.html', vectors=vectors)
+
+    except Exception as e:
+        await flash(f"Error loading vectors: {str(e)}", "danger")
+        return redirect(url_for('index'))
 
 if __name__ == "__main__":
     app.run(debug=True)
