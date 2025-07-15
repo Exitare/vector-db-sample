@@ -35,7 +35,8 @@
         </div>
         <div class="mb-3">
             <label for="vector-values" class="form-label">Vector (comma-separated)</label>
-            <input type="text" class="form-control" id="vector-values" name="vector" placeholder="e.g. 0.1,0.2,0.3,0.4" required>
+            <input type="text" class="form-control" id="vector-values" name="vector" placeholder="e.g. 0.1,0.2,0.3,0.4"
+                   required>
         </div>
         <div class="mb-3">
             <label for="vector-label" class="form-label">Label (optional)</label>
@@ -53,7 +54,8 @@
     <form action="/search-vector" method="post" class="card p-4 shadow-sm mb-4">
         <div class="mb-3">
             <label for="query_vector" class="form-label">Search Vector (comma-separated)</label>
-            <input type="text" class="form-control" id="query_vector" name="query_vector" placeholder="e.g. 0.1,0.2,0.3,0.4" required>
+            <input type="text" class="form-control" id="query_vector" name="query_vector"
+                   placeholder="e.g. 0.1,0.2,0.3,0.4" required>
         </div>
         <button type="submit" class="btn btn-success">Search</button>
     </form>
@@ -63,31 +65,41 @@
     <h2 class="mt-4">Search Results</h2>
     <table class="table table-bordered table-striped mt-3">
         <thead>
-            <tr>
-                <th>ID</th>
-                <th>Document</th>
-                <th>Metadata</th>
-                <th>Distance</th>
-            </tr>
+        <tr>
+            <th>ID</th>
+            <th>Document</th>
+            <th>Metadata</th>
+            <th>Distance</th>
+        </tr>
         </thead>
         <tbody>
-            {% for result in results %}
-            <tr>
-                <td>{{ result.id }}</td>
-                <td>{{ result.document }}</td>
-                <td>
-                    {% if result.metadata %}
-                        <pre class="mb-0">{{ result.metadata | tojson(indent=0) }}</pre>
-                    {% else %}
-                        &mdash;
-                    {% endif %}
-                </td>
-                <td>{{ "%.4f"|format(result.distance) }}</td>
-            </tr>
-            {% endfor %}
+        {% for result in results %}
+        <tr>
+            <td>{{ result.id }}</td>
+            <td>{{ result.document }}</td>
+            <td>
+                {% if result.metadata %}
+                <pre class="mb-0">{{ result.metadata | tojson(indent=0) }}</pre>
+                {% else %}
+                &mdash;
+                {% endif %}
+            </td>
+            <td>{{ "%.4f"|format(result.distance) }}</td>
+        </tr>
+        {% endfor %}
         </tbody>
     </table>
     {% endif %}
+
+    <!-- Upload CSV Form -->
+    <h1 class="mt-5 mb-4">Upload CSV to Add Vectors</h1>
+    <form action="/upload-data" method="post" enctype="multipart/form-data" class="card p-4 shadow-sm">
+        <div class="mb-3">
+            <label for="data_file" class="form-label">Select CSV or HDF5 File</label>
+            <input class="form-control" type="file" id="data_file" name="data_file" accept=".csv,.h5,.hdf5" required>
+        </div>
+        <button type="submit" class="btn btn-secondary">Upload File</button>
+    </form>
 
 </div>
 </body>

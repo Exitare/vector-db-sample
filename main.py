@@ -1,13 +1,17 @@
 from quart import Quart, render_template, request, redirect, url_for, flash
 import chromadb
-from chromadb.config import Settings
+import pandas as pd
+import io
+import os
+import h5py
 
 app = Quart(__name__)
 app.secret_key = "your-secret-key"
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB, adjust as needed
 
 # Initialize Chroma DB
 chroma_client = chromadb.PersistentClient(path=".chromadb")
-collection = chroma_client.get_or_create_collection("my_collection")
+collection = chroma_client.get_or_create_collection("heterogeneous_vectors")
 
 
 @app.route('/', methods=['GET'])
@@ -64,6 +68,68 @@ async def search_vector():
     ]
 
     return await render_template("index.html", results=hits)
+
+
+@app.route('/upload-data', methods=['POST'])
+async def upload_data():
+    files = await request.files
+    if 'data_file' not in files:
+        await flash("No file uploaded.", "danger")
+        return redirect(url_for('index'))
+
+    file = files['data_file']
+
+    if file.filename == '':
+        await flash("No selected file.", "danger")
+        return redirect(url_for('index'))
+
+    filename = file.filename.lower()
+
+    try:
+        content = file.read()  # This is sync, valid in Quart
+        if filename.endswith('.csv'):
+            df = pd.read_csv(io.StringIO(content.decode('utf-8')))
+            ids = df['submitter_ids'].astype(str).tolist()
+            embeddings = df['X'].apply(lambda v: list(map(float, v.split(',')))).tolist()
+            metadatas = [{'y': y.decode('utf-8') if isinstance(y, bytes) else y} for y in y_values.tolist()]
+
+        elif filename.endswith('.h5') or filename.endswith('.hdf5'):
+            # Save and load with h5py
+            filepath = f"/tmp/{file.filename}"
+            with open(filepath, 'wb') as f:
+                f.write(content)
+
+            with h5py.File(filepath, 'r') as f:
+                # Assuming datasets are stored as arrays: /submitter_ids, /X, /y
+                ids = [str(x) for x in f['submitter_ids'][()]]
+                embeddings = f['X'][()].tolist()
+                y_values = f['y'][()]
+                if hasattr(y_values, "tolist"):  # numpy array
+                    y_values = y_values.tolist()
+                metadatas = [{'y': y.decode('utf-8') if isinstance(y, bytes) else y} for y in y_values]
+
+            os.remove(filepath)
+
+        else:
+            await flash("Unsupported file type. Please upload a .csv or .h5 file.", "danger")
+            return redirect(url_for('index'))
+
+        # Batch upload to Chroma
+        batch_size = 100
+        for i in range(0, len(ids), batch_size):
+            collection.add(
+                ids=ids[i:i + batch_size],
+                embeddings=embeddings[i:i + batch_size],
+                metadatas=metadatas[i:i + batch_size]
+            )
+
+        await flash(f"Uploaded and stored {len(ids)} vectors.", "success")
+
+    except Exception as e:
+        print("Upload error:", e)
+        await flash(f"Error processing file: {str(e)}", "danger")
+
+    return redirect(url_for('index'))
 
 
 if __name__ == "__main__":
