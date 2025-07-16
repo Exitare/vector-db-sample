@@ -4,6 +4,7 @@ import pandas as pd
 import io
 import os
 import h5py
+import json
 
 app = Quart(__name__)
 app.secret_key = "your-secret-key"
@@ -18,7 +19,9 @@ collection = chroma_client.get_or_create_collection("heterogeneous_vectors")
 async def index():
     collections = chroma_client.list_collections()
     collection_names = [col.name for col in collections]
-    return await render_template("index.html", results=None, collections=collection_names, current_collection=collection.name)
+    return await render_template("index.html", results=None, collections=collection_names,
+                                 current_collection=collection.name)
+
 
 @app.route('/set-collection', methods=['POST'])
 async def set_collection():
@@ -28,6 +31,7 @@ async def set_collection():
     collection = chroma_client.get_or_create_collection(name=selected_name)
     await flash(f"Switched to collection: {selected_name}", "success")
     return redirect(url_for('index'))
+
 
 @app.route('/add-vector', methods=['POST'])
 async def add_vector():
@@ -60,9 +64,11 @@ async def search_vector():
     try:
         results = collection.query(
             query_embeddings=[query_vector],
-            n_results=5,
+            n_results=10,
             include=['documents', 'metadatas', 'distances']
         )
+
+        print(results)
     except Exception as e:
         await flash(f"Search failed: {str(e)}", "danger")
         return redirect(url_for('index'))
@@ -162,6 +168,39 @@ async def browse_vectors():
     except Exception as e:
         await flash(f"Error loading vectors: {str(e)}", "danger")
         return redirect(url_for('index'))
+
+
+@app.route('/create-collection', methods=['POST'])
+async def create_collection():
+    form = await request.form
+    name = form.get('new_collection_name', '').strip()
+    metadata = form.get('collection_metadata', '').strip()
+
+    if not name:
+        await flash("Collection name is required.", "danger")
+        return redirect(url_for('create_collection_page'))
+
+    try:
+        meta = json.loads(metadata) if metadata else None
+        chroma_client.create_collection(name=name, metadata=meta)
+        await flash(f"Collection '{name}' created successfully.", "success")
+    except Exception as e:
+        await flash(f"Error creating collection: {e}", "danger")
+
+    return redirect(url_for('index'))
+
+
+def get_all_collections():
+    return [col.name for col in chroma_client.list_collections()]
+
+@app.route('/create-collection', methods=['GET'])
+async def create_collection_page():
+    return await render_template(
+        'create.html',
+        current_collection=collection,  # Safe fallback
+        collections=get_all_collections()
+    )
+
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Create New Collection{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Create a New Collection</h2>
+
+<form action="/create-collection" method="post" class="card p-4 shadow-sm">
+    <div class="mb-3">
+        <label for="new_collection_name" class="form-label">Collection Name</label>
+        <input type="text" class="form-control" id="new_collection_name" name="new_collection_name" required placeholder="e.g. my_embeddings_v1">
+    </div>
+
+    <div class="mb-3">
+        <label for="collection_metadata" class="form-label">Optional Metadata (JSON format)</label>
+        <textarea class="form-control" id="collection_metadata" name="collection_metadata" rows="3" placeholder='{"source": "experiment_1", "note": "initial set"}'></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Create Collection</button>
+</form>
+
+<a href="/" class="btn btn-link mt-4"><i class="fas fa-arrow-left me-1"></i>Back to Home</a>
+{% endblock %}
