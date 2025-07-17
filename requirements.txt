@@ -1,0 +1,6 @@
+pandas
+chromadb
+quart
+h5py
+matplotlib
+umap-learn
