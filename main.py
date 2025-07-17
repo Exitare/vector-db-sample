@@ -1,10 +1,14 @@
-from quart import Quart, render_template, request, redirect, url_for, flash
+from quart import Quart, render_template, request, redirect, url_for, flash, jsonify
 import chromadb
 import pandas as pd
 import io
 import os
 import h5py
 import json
+from collections import Counter
+import umap
+import matplotlib.pyplot as plt
+import base64
 
 app = Quart(__name__)
 app.secret_key = "your-secret-key"
@@ -151,23 +155,88 @@ async def upload_data():
 @app.route('/browse-vectors')
 async def browse_vectors():
     try:
-        # Fetch all vectors from your Chroma collection
         results = collection.get(include=["embeddings", "metadatas", "documents"])
 
         vectors = []
+        cancer_types = []
+
         for i in range(len(results['ids'])):
+            metadata = results['metadatas'][i] if results['metadatas'] else None
+            cancer_type = metadata.get("y") if metadata else "Unknown"
+
             vectors.append({
                 'id': results['ids'][i],
                 'embedding': results['embeddings'][i],
-                'metadata': results['metadatas'][i] if results['metadatas'] else None,
+                'metadata': metadata,
                 'document': results['documents'][i] if results['documents'] else None
             })
 
-        return await render_template('browse.html', vectors=vectors)
+            cancer_types.append(cancer_type)
+
+        cancer_counts = dict(Counter(cancer_types))
+
+        return await render_template(
+            'browse.html',
+            vectors=vectors,
+            cancer_counts=cancer_counts
+        )
 
     except Exception as e:
         await flash(f"Error loading vectors: {str(e)}", "danger")
         return redirect(url_for('index'))
+
+@app.route('/generate-umap')
+async def generate_umap():
+    try:
+        results = collection.get(include=["embeddings", "metadatas"])
+        embeddings = results["embeddings"]
+        metadatas = results["metadatas"]
+
+        # Extract and map cancer types to numeric values
+        cancer_types = []
+        for meta in metadatas:
+            y = meta.get("y", "Unknown")
+            if isinstance(y, bytes):
+                y = y.decode()
+            cancer_types.append(str(y))
+
+        unique_labels = sorted(set(cancer_types))
+        label_to_int = {label: idx for idx, label in enumerate(unique_labels)}
+        color_vals = [label_to_int[label] for label in cancer_types]
+
+        # UMAP
+        reducer = umap.UMAP(n_components=2, random_state=42)
+        reduced = reducer.fit_transform(embeddings)
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(8, 6))
+        scatter = ax.scatter(reduced[:, 0], reduced[:, 1], c=color_vals, cmap='tab10', alpha=0.7)
+        ax.set_title("UMAP Projection of Embeddings")
+        ax.set_xlabel("UMAP 1")
+        ax.set_ylabel("UMAP 2")
+
+        # Legend
+        handles = [
+            plt.Line2D([0], [0], marker='o', color='w',
+                       label=label, markersize=7,
+                       markerfacecolor=plt.cm.tab10(label_to_int[label] % 10))
+            for label in unique_labels
+        ]
+        ax.legend(handles=handles, title="Cancer Types", bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        # Save to base64
+        buf = io.BytesIO()
+        plt.tight_layout()
+        plt.savefig(buf, format="png", dpi=300)
+        buf.seek(0)
+        img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        plt.close(fig)
+
+        return jsonify({"success": True, "image": img_base64})
+
+    except Exception as e:
+        print(f"UMAP generation error: {e}")
+        return jsonify({"success": False, "error": str(e)})
 
 
 @app.route('/create-collection', methods=['POST'])
@@ -192,6 +261,7 @@ async def create_collection():
 
 def get_all_collections():
     return [col.name for col in chroma_client.list_collections()]
+
 
 @app.route('/create-collection', methods=['GET'])
 async def create_collection_page():

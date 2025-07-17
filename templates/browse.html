@@ -5,6 +5,18 @@
 {% block content %}
 <h1 class="mb-4">All Stored Vectors</h1>
 
+<!-- Bar Chart -->
+<canvas id="cancerChart" width="400" height="150" class="mb-5"></canvas>
+
+<!-- UMAP placeholder -->
+<div class="mb-5" id="umap-container">
+    <h4>UMAP Projection of Embeddings</h4>
+    <div id="umap-placeholder" class="d-flex justify-content-center align-items-center"
+         style="height: 300px; background-color: #f8f9fa; border: 1px solid #dee2e6;">
+        <span class="text-muted">Generating UMAP plot...</span>
+    </div>
+</div>
+
 <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
     <table class="table table-bordered table-hover table-sm align-middle">
         <thead class="table-light sticky-top">
@@ -31,4 +43,16 @@
 </div>
 
 <a href="/" class="btn btn-secondary mt-4">Back</a>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const cancerCounts = {
+        labels: {{ cancer_counts.keys() | list | tojson }},
+        data: {{ cancer_counts.values() | list | tojson }}
+    };
+</script>
+<script src="{{ url_for('static', filename='js/chart_loader.js') }}"></script>
+<script src="{{ url_for('static', filename='js/umap_loader.js') }}"></script>
 {% endblock %}
