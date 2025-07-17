@@ -1,14 +1,15 @@
 from quart import Quart, render_template, request, redirect, url_for, flash, jsonify
 import chromadb
 import pandas as pd
-import io
 import os
 import h5py
 import json
 from collections import Counter
-import umap
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+import io
 import base64
+import umap
 
 app = Quart(__name__)
 app.secret_key = "your-secret-key"
@@ -185,6 +186,7 @@ async def browse_vectors():
         await flash(f"Error loading vectors: {str(e)}", "danger")
         return redirect(url_for('index'))
 
+
 @app.route('/generate-umap')
 async def generate_umap():
     try:
@@ -192,7 +194,7 @@ async def generate_umap():
         embeddings = results["embeddings"]
         metadatas = results["metadatas"]
 
-        # Extract and map cancer types to numeric values
+        # Extract cancer types
         cancer_types = []
         for meta in metadatas:
             y = meta.get("y", "Unknown")
@@ -201,16 +203,17 @@ async def generate_umap():
             cancer_types.append(str(y))
 
         unique_labels = sorted(set(cancer_types))
-        label_to_int = {label: idx for idx, label in enumerate(unique_labels)}
-        color_vals = [label_to_int[label] for label in cancer_types]
+        color_list = list(mcolors.TABLEAU_COLORS.values()) + list(mcolors.CSS4_COLORS.values())
+        label_colors = {label: color_list[i % len(color_list)] for i, label in enumerate(unique_labels)}
+        point_colors = [label_colors[label] for label in cancer_types]
 
-        # UMAP
+        # UMAP projection
         reducer = umap.UMAP(n_components=2, random_state=42)
         reduced = reducer.fit_transform(embeddings)
 
         # Plot
         fig, ax = plt.subplots(figsize=(8, 6))
-        scatter = ax.scatter(reduced[:, 0], reduced[:, 1], c=color_vals, cmap='tab10', alpha=0.7)
+        scatter = ax.scatter(reduced[:, 0], reduced[:, 1], c=point_colors, alpha=0.7)
         ax.set_title("UMAP Projection of Embeddings")
         ax.set_xlabel("UMAP 1")
         ax.set_ylabel("UMAP 2")
@@ -219,12 +222,12 @@ async def generate_umap():
         handles = [
             plt.Line2D([0], [0], marker='o', color='w',
                        label=label, markersize=7,
-                       markerfacecolor=plt.cm.tab10(label_to_int[label] % 10))
+                       markerfacecolor=label_colors[label])
             for label in unique_labels
         ]
         ax.legend(handles=handles, title="Cancer Types", bbox_to_anchor=(1.05, 1), loc='upper left')
 
-        # Save to base64
+        # Save plot to base64
         buf = io.BytesIO()
         plt.tight_layout()
         plt.savefig(buf, format="png", dpi=300)

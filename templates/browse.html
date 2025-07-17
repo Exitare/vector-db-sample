@@ -24,29 +24,31 @@
     </div>
 </div>
 
-<div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-    <table class="table table-bordered table-hover table-sm align-middle">
-        <thead class="table-light sticky-top">
-        <tr>
-            <th>ID</th>
-            <th>Document</th>
-            <th>Metadata</th>
-            <th>Embedding (truncated)</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for vector in vectors %}
-        <tr>
-            <td>{{ vector.id }}</td>
-            <td>{{ vector.document or "—" }}</td>
-            <td>
-                <pre class="mb-0">{{ vector.metadata | tojson(indent=0) }}</pre>
-            </td>
-            <td><code>{{ vector.embedding[:10] }}...</code></td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+<div class="row py-5">
+    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+        <table class="table table-bordered table-hover table-sm align-middle">
+            <thead class="table-light sticky-top">
+            <tr>
+                <th>ID</th>
+                <th>Document</th>
+                <th>Metadata</th>
+                <th>Embedding (truncated)</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for vector in vectors %}
+            <tr>
+                <td>{{ vector.id }}</td>
+                <td>{{ vector.document or "—" }}</td>
+                <td>
+                    <pre class="mb-0">{{ vector.metadata | tojson(indent=0) }}</pre>
+                </td>
+                <td><code>{{ vector.embedding[:10] }}...</code></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 
