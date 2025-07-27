@@ -173,6 +173,65 @@ async def api_search_vector():
         }), 500
 
 
+@app.route('/api/vectors-3d', methods=['GET'])
+async def api_vectors_3d():
+    """API endpoint for 3D visualization data (optimized for performance)"""
+    try:
+        # Get vectors with pagination limit for performance
+        limit = min(int(request.args.get('limit', 1000)), 5000)  # Max 5000 points
+        
+        # Get all vectors with embeddings and metadata
+        results = collection.get(include=["embeddings", "metadatas", "documents"])
+        
+        if not results['ids']:
+            return jsonify({
+                'success': True,
+                'vectors': []
+            })
+        
+        vectors_3d = []
+        # Limit the number of data points to prevent browser overload
+        total_points = min(len(results['ids']), limit)
+        
+        for i in range(total_points):
+            # Safely get metadata
+            metadata = None
+            if results['metadatas'] is not None and i < len(results['metadatas']):
+                metadata = results['metadatas'][i]
+            
+            cancer_type = 'Unknown'
+            if metadata and isinstance(metadata, dict):
+                cancer_type = metadata.get('y', 'Unknown')
+            
+            # Safely get embedding - only take first 3 dimensions for 3D visualization
+            embedding_3d = [0.0, 0.0, 0.0]  # Default values
+            if results['embeddings'] is not None and i < len(results['embeddings']):
+                full_embedding = results['embeddings'][i]
+                # Extract only first 3 dimensions
+                for j in range(min(3, len(full_embedding))):
+                    embedding_3d[j] = float(full_embedding[j])
+            
+            vectors_3d.append({
+                'id': results['ids'][i],
+                'embedding': embedding_3d,  # Only 3D coordinates
+                'cancer_type': cancer_type,
+                'document': results['documents'][i] if results['documents'] and i < len(results['documents']) else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'vectors': vectors_3d,
+            'total_available': len(results['ids']),
+            'returned': len(vectors_3d)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to load 3D data: {str(e)}'
+        }), 500
+
+
 @app.route('/upload-data', methods=['POST'])
 async def upload_data():
     files = await request.files

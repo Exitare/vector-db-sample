@@ -3,6 +3,176 @@
 {% block title %}Explore Data - Vector Research Platform{% endblock %}
 
 {% block content %}
+<style>
+/* 3D Vector Visualization Styles */
+.vector-3d-container {
+    position: relative;
+    width: 100%;
+    height: 500px;
+    min-height: 450px;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.visualization-3d-legend {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    max-height: 300px;
+    overflow-y: auto;
+    min-width: 150px;
+}
+
+.legend-header h6 {
+    margin: 0;
+    color: #495057;
+    font-size: 0.875rem;
+}
+
+.legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.legend-item:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.legend-label {
+    font-size: 0.75rem;
+    color: #495057;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vector-3d-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    max-width: 300px;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    display: none;
+}
+
+.tooltip-header {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tooltip-content > div {
+    margin-bottom: 0.25rem;
+}
+
+.tooltip-content > div:last-child {
+    margin-bottom: 0;
+}
+
+.vector-3d-controls {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+}
+
+.vector-3d-controls .controls-text {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin: 0;
+    line-height: 1.2;
+}
+
+#vector-3d-placeholder {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: rgba(248, 249, 250, 0.9);
+    z-index: 10;
+}
+
+/* Ensure Three.js canvas is visible */
+.vector-3d-container canvas {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 5 !important;
+}
+
+/* Bootstrap override */
+.d-none {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .visualization-3d-legend {
+        top: 5px;
+        right: 5px;
+        padding: 0.5rem;
+        min-width: 120px;
+        max-height: 200px;
+    }
+    
+    .legend-label {
+        font-size: 0.7rem;
+    }
+    
+    .vector-3d-controls {
+        bottom: 5px;
+        left: 5px;
+        padding: 0.4rem 0.6rem;
+    }
+    
+    .vector-3d-container {
+        height: 300px;
+        min-height: 250px;
+    }
+}
+</style>
 
 <!-- Hero Section -->
 <div class="page-header">
@@ -205,7 +375,7 @@
         </div>
     </div>
 
-    <!-- Analytics Dashboard -->
+    <!-- Analytics Dashboard - Distribution and UMAP Row -->
     <div class="row mb-5">
         <div class="col-lg-6 mb-4">
             <div class="card animate-fade-in h-100">
@@ -247,6 +417,42 @@
                                 <div class="text-muted">Initializing UMAP visualization...</div>
                                 <small class="text-muted">This process runs in the background</small>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Vector Space - Dedicated Row -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-cube text-warning me-2"></i>
+                        3D Vector Space
+                    </h4>
+                    <p class="text-muted mb-0">Interactive 3D exploration of vector embeddings color-coded by cancer type</p>
+                </div>
+                <div class="card-body p-0">
+                    <div id="vector-3d-container" class="vector-3d-container" style="height: 500px; min-height: 450px;">
+                        <div id="vector-3d-placeholder" class="d-flex justify-content-center align-items-center glass-effect rounded"
+                             style="height: 100%; min-height: 450px;">
+                            <div class="text-center">
+                                <div class="spinner-border text-warning mb-2" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <div class="text-muted">Loading 3D visualization...</div>
+                                <small class="text-muted">Preparing interactive 3D scene</small>
+                            </div>
+                        </div>
+                        <div class="vector-3d-controls">
+                            <p class="controls-text mb-0">
+                                <i class="fas fa-mouse-pointer me-1"></i>Click & drag to rotate<br>
+                                <i class="fas fa-search-plus me-1"></i>Scroll to zoom<br>
+                                <i class="fas fa-hand-paper me-1"></i>Right-click & drag to pan
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -355,9 +561,63 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Three.js for 3D visualization -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- Chart.js for 2D charts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Custom JavaScript modules -->
 <script src="{{ url_for('static', filename='js/chart_loader.js') }}"></script>
 <script src="{{ url_for('static', filename='js/umap_loader.js') }}"></script>
 <script src="{{ url_for('static', filename='js/upload_handler.js') }}"></script>
 <script src="{{ url_for('static', filename='js/vector_search.js') }}"></script>
+<script>
+// Error handler for 3D visualization debugging
+window.addEventListener('error', function(event) {
+    console.error('=== GLOBAL ERROR CAUGHT ===');
+    console.error('Message:', event.message);
+    console.error('Source:', event.filename);
+    console.error('Line:', event.lineno);
+    console.error('Column:', event.colno);
+    console.error('Error object:', event.error);
+});
+
+// Simple debug check
+console.log('=== 3D Visualization Debug ===');
+console.log('THREE loaded:', typeof THREE !== 'undefined');
+
+if (typeof THREE !== 'undefined') {
+    console.log('✓ THREE.js is ready');
+    
+    // Test if we can create basic Three.js objects
+    try {
+        new THREE.Scene();
+        console.log('✓ THREE.Scene works');
+        
+        new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+        console.log('✓ THREE.PerspectiveCamera works');
+        
+        new THREE.WebGLRenderer();
+        console.log('✓ THREE.WebGLRenderer works - WebGL is supported');
+        
+        console.log('✓ All Three.js basics working');
+    } catch (error) {
+        console.error('✗ Three.js basic test failed:', error);
+    }
+} else {
+    console.error('✗ THREE.js not loaded');
+}
+
+// Quick API test
+console.log('Testing API endpoint...');
+fetch('/api/vectors-3d')
+    .then(response => response.json())
+    .then(data => {
+        console.log('✓ API working, vectors:', data.vectors?.length);
+        console.log('API response size:', JSON.stringify(data).length, 'bytes');
+    })
+    .catch(error => console.error('✗ API failed:', error));
+</script>
+<script src="{{ url_for('static', filename='js/vector_3d.js') }}"></script>
 {% endblock %}
