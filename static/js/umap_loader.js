@@ -71,9 +71,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const placeholder = document.getElementById('umap-placeholder');
         const img = document.createElement('img');
         img.src = 'data:image/png;base64,' + imageData;
-        img.className = 'img-fluid rounded shadow-sm';
-        img.style.maxHeight = '250px';
-        img.style.width = 'auto';
+        img.className = 'img-fluid rounded shadow-sm w-100';
+        img.style.height = '100%';
+        img.style.objectFit = 'contain';
+        img.style.maxHeight = '400px';
         
         // Fade in effect
         img.style.opacity = '0';

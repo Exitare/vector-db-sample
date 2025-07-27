@@ -18,6 +18,11 @@
                     Explore your vector embeddings through interactive visualizations and data analysis.
                     Discover patterns and relationships in your high-dimensional research data.
                 </p>
+                <div class="mt-4">
+                    <a href="/" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
             </div>
             <div class="col-lg-4 text-center">
                 <div class="stats-card">
@@ -64,7 +69,7 @@
                 <div class="card-body">
                     <div id="umap-container">
                         <div id="umap-placeholder" class="d-flex justify-content-center align-items-center glass-effect rounded"
-                             style="height: 250px;">
+                             style="height: 400px; min-height: 350px;">
                             <div class="text-center">
                                 <div class="spinner-border text-primary mb-2" role="status">
                                     <span class="visually-hidden">Loading...</span>
@@ -84,17 +89,12 @@
         <div class="col-12">
             <div class="card animate-fade-in">
                 <div class="card-header bg-transparent border-0 pb-0">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h4 class="card-title mb-1">
-                                <i class="fas fa-table text-info me-2"></i>
-                                Vector Dataset
-                            </h4>
-                            <p class="text-muted mb-0">Complete view of stored vectors and metadata</p>
-                        </div>
-                        <a href="/" class="btn btn-outline-primary">
-                            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
-                        </a>
+                    <div>
+                        <h4 class="card-title mb-1">
+                            <i class="fas fa-table text-info me-2"></i>
+                            Vector Dataset
+                        </h4>
+                        <p class="text-muted mb-0">Complete view of stored vectors and metadata</p>
                     </div>
                 </div>
                 <div class="card-body p-0">

@@ -1,6 +1,7 @@
 from quart import Quart, render_template, request, redirect, url_for, flash, jsonify
 import chromadb
 import pandas as pd
+import numpy as np
 import os
 import h5py
 import json
@@ -275,15 +276,17 @@ def generate_umap_sync(embeddings, metadatas):
         import matplotlib
         matplotlib.use('Agg')  # Use non-GUI backend
         import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        import numpy as np
         
-        # Validate input
-        if not embeddings or len(embeddings) == 0:
+        # Validate input safely (avoid boolean evaluation on arrays)
+        if embeddings is None or len(embeddings) == 0:
             return {"success": False, "error": "No embeddings provided"}
         
         if len(embeddings) < 2:
             return {"success": False, "error": "Need at least 2 vectors for UMAP projection"}
-        
-        # Extract cancer types
+
+        # Extract cancer types (using your exact working logic)
         cancer_types = []
         for meta in metadatas:
             y = meta.get("y", "Unknown") if meta else "Unknown"
@@ -292,52 +295,39 @@ def generate_umap_sync(embeddings, metadatas):
             cancer_types.append(str(y))
 
         unique_labels = sorted(set(cancer_types))
-        
-        # Limit colors to available ones
         color_list = list(mcolors.TABLEAU_COLORS.values()) + list(mcolors.CSS4_COLORS.values())
         label_colors = {label: color_list[i % len(color_list)] for i, label in enumerate(unique_labels)}
         point_colors = [label_colors[label] for label in cancer_types]
 
-        # UMAP projection with optimized parameters
-        reducer = umap.UMAP(
-            n_components=2, 
-            random_state=42,
-            n_neighbors=min(15, len(embeddings) - 1),  # Adjust for small datasets
-            min_dist=0.1,
-            metric='cosine'
-        )
+        # UMAP projection (using your exact working parameters)
+        reducer = umap.UMAP(n_components=2, random_state=42)
         reduced = reducer.fit_transform(embeddings)
 
-        # Create figure with explicit figsize and DPI
-        fig = plt.figure(figsize=(8, 6), dpi=100)
-        ax = fig.add_subplot(111)
-        
-        scatter = ax.scatter(reduced[:, 0], reduced[:, 1], c=point_colors, alpha=0.7, s=30)
+        # Plot (using your exact working approach but with larger size)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        scatter = ax.scatter(reduced[:, 0], reduced[:, 1], c=point_colors, alpha=0.7)
         ax.set_title("UMAP Projection of Embeddings", fontsize=14, fontweight='bold')
-        ax.set_xlabel("UMAP 1", fontsize=12)
-        ax.set_ylabel("UMAP 2", fontsize=12)
-        ax.grid(True, alpha=0.3)
+        ax.set_xlabel("UMAP 1")
+        ax.set_ylabel("UMAP 2")
 
-        # Legend - limit to reasonable number of labels
-        if len(unique_labels) <= 20:  # Only show legend if not too many categories
-            handles = [
-                plt.Line2D([0], [0], marker='o', color='w',
-                           label=label, markersize=7,
-                           markerfacecolor=label_colors[label])
-                for label in unique_labels
-            ]
-            ax.legend(handles=handles, title="Categories", bbox_to_anchor=(1.05, 1), loc='upper left')
+        # Legend (using your exact working legend code)
+        handles = [
+            plt.Line2D([0], [0], marker='o', color='w',
+                       label=label, markersize=7,
+                       markerfacecolor=label_colors[label])
+            for label in unique_labels
+        ]
+        ax.legend(handles=handles, title="Cancer Types", bbox_to_anchor=(1.05, 1), loc='upper left')
 
-        # Save plot to base64
+        # Save plot to base64 (with higher DPI for better quality)
         buf = io.BytesIO()
         plt.tight_layout()
-        fig.savefig(buf, format="png", dpi=150, bbox_inches='tight', facecolor='white')
+        fig.savefig(buf, format="png", dpi=200, bbox_inches='tight', facecolor='white')
         buf.seek(0)
         img_base64 = base64.b64encode(buf.read()).decode("utf-8")
         
-        # Explicitly close figure and clear memory
+        # Clean up
         plt.close(fig)
-        plt.clf()
 
         return {"success": True, "image": img_base64}
 
