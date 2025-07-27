@@ -24,7 +24,7 @@ collection = chroma_client.get_or_create_collection("heterogeneous_vectors")
 async def index():
     collections = chroma_client.list_collections()
     collection_names = [col.name for col in collections]
-    return await render_template("index.html", results=None, collections=collection_names,
+    return await render_template("index.html", collections=collection_names,
                                  current_collection=collection.name)
 
 
@@ -89,6 +89,61 @@ async def search_vector():
     ]
 
     return await render_template("index.html", results=hits)
+
+
+@app.route('/api/search-vector', methods=['POST'])
+async def api_search_vector():
+    """API endpoint for AJAX vector search"""
+    try:
+        data = await request.get_json()
+        query_vector_str = data.get('query_vector', '')
+        
+        if not query_vector_str:
+            return jsonify({
+                'success': False, 
+                'error': 'Query vector is required'
+            }), 400
+        
+        try:
+            query_vector = list(map(float, query_vector_str.split(',')))
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid vector format. Please enter comma-separated numbers (e.g., 0.1, 0.2, 0.3)'
+            }), 400
+
+        if len(query_vector) == 0:
+            return jsonify({
+                'success': False,
+                'error': 'Query vector cannot be empty'
+            }), 400
+
+        results = collection.query(
+            query_embeddings=[query_vector],
+            n_results=10,
+            include=['documents', 'metadatas', 'distances']
+        )
+
+        hits = [
+            {
+                "id": results["ids"][0][i],
+                "document": results["documents"][0][i],
+                "metadata": results["metadatas"][0][i],
+                "distance": results["distances"][0][i],
+            }
+            for i in range(len(results["ids"][0]))
+        ]
+
+        return jsonify({
+            'success': True,
+            'results': hits
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Search failed: {str(e)}'
+        }), 500
 
 
 @app.route('/upload-data', methods=['POST'])
