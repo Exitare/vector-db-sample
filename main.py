@@ -5,15 +5,26 @@ import os
 import h5py
 import json
 from collections import Counter
+import matplotlib
+matplotlib.use('Agg')  # Set non-interactive backend before importing pyplot
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import io
 import base64
 import umap
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 app = Quart(__name__)
 app.secret_key = "your-secret-key"
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB, adjust as needed
+
+# Thread pool for background tasks
+executor = ThreadPoolExecutor(max_workers=2)
+
+# Storage for UMAP generation tasks
+umap_cache = {}
 
 # Initialize Chroma DB
 chroma_client = chromadb.PersistentClient(path=".chromadb")
@@ -242,59 +253,165 @@ async def browse_vectors():
         return redirect(url_for('index'))
 
 
-@app.route('/generate-umap')
-async def generate_umap():
+def generate_umap_sync(embeddings, metadatas):
+    """Synchronous UMAP generation function to run in thread pool"""
     try:
-        results = collection.get(include=["embeddings", "metadatas"])
-        embeddings = results["embeddings"]
-        metadatas = results["metadatas"]
-
+        # Set matplotlib to use non-interactive backend for thread safety
+        import matplotlib
+        matplotlib.use('Agg')  # Use non-GUI backend
+        import matplotlib.pyplot as plt
+        
+        # Validate input
+        if not embeddings or len(embeddings) == 0:
+            return {"success": False, "error": "No embeddings provided"}
+        
+        if len(embeddings) < 2:
+            return {"success": False, "error": "Need at least 2 vectors for UMAP projection"}
+        
         # Extract cancer types
         cancer_types = []
         for meta in metadatas:
-            y = meta.get("y", "Unknown")
+            y = meta.get("y", "Unknown") if meta else "Unknown"
             if isinstance(y, bytes):
                 y = y.decode()
             cancer_types.append(str(y))
 
         unique_labels = sorted(set(cancer_types))
+        
+        # Limit colors to available ones
         color_list = list(mcolors.TABLEAU_COLORS.values()) + list(mcolors.CSS4_COLORS.values())
         label_colors = {label: color_list[i % len(color_list)] for i, label in enumerate(unique_labels)}
         point_colors = [label_colors[label] for label in cancer_types]
 
-        # UMAP projection
-        reducer = umap.UMAP(n_components=2, random_state=42)
+        # UMAP projection with optimized parameters
+        reducer = umap.UMAP(
+            n_components=2, 
+            random_state=42,
+            n_neighbors=min(15, len(embeddings) - 1),  # Adjust for small datasets
+            min_dist=0.1,
+            metric='cosine'
+        )
         reduced = reducer.fit_transform(embeddings)
 
-        # Plot
-        fig, ax = plt.subplots(figsize=(8, 6))
-        scatter = ax.scatter(reduced[:, 0], reduced[:, 1], c=point_colors, alpha=0.7)
-        ax.set_title("UMAP Projection of Embeddings")
-        ax.set_xlabel("UMAP 1")
-        ax.set_ylabel("UMAP 2")
+        # Create figure with explicit figsize and DPI
+        fig = plt.figure(figsize=(8, 6), dpi=100)
+        ax = fig.add_subplot(111)
+        
+        scatter = ax.scatter(reduced[:, 0], reduced[:, 1], c=point_colors, alpha=0.7, s=30)
+        ax.set_title("UMAP Projection of Embeddings", fontsize=14, fontweight='bold')
+        ax.set_xlabel("UMAP 1", fontsize=12)
+        ax.set_ylabel("UMAP 2", fontsize=12)
+        ax.grid(True, alpha=0.3)
 
-        # Legend
-        handles = [
-            plt.Line2D([0], [0], marker='o', color='w',
-                       label=label, markersize=7,
-                       markerfacecolor=label_colors[label])
-            for label in unique_labels
-        ]
-        ax.legend(handles=handles, title="Cancer Types", bbox_to_anchor=(1.05, 1), loc='upper left')
+        # Legend - limit to reasonable number of labels
+        if len(unique_labels) <= 20:  # Only show legend if not too many categories
+            handles = [
+                plt.Line2D([0], [0], marker='o', color='w',
+                           label=label, markersize=7,
+                           markerfacecolor=label_colors[label])
+                for label in unique_labels
+            ]
+            ax.legend(handles=handles, title="Categories", bbox_to_anchor=(1.05, 1), loc='upper left')
 
         # Save plot to base64
         buf = io.BytesIO()
         plt.tight_layout()
-        plt.savefig(buf, format="png", dpi=300)
+        fig.savefig(buf, format="png", dpi=150, bbox_inches='tight', facecolor='white')
         buf.seek(0)
         img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        
+        # Explicitly close figure and clear memory
         plt.close(fig)
+        plt.clf()
 
-        return jsonify({"success": True, "image": img_base64})
+        return {"success": True, "image": img_base64}
 
     except Exception as e:
-        print(f"UMAP generation error: {e}")
+        # Make sure to clean up matplotlib resources even on error
+        try:
+            plt.close('all')
+            plt.clf()
+        except:
+            pass
+        return {"success": False, "error": f"UMAP generation failed: {str(e)}"}
+
+
+@app.route('/generate-umap')
+async def generate_umap():
+    """Start UMAP generation asynchronously"""
+    try:
+        # Generate a unique task ID based on current collection
+        task_id = f"umap_{collection.name}_{hash(str(collection._client))}"
+        
+        # Check if we already have a cached result
+        if task_id in umap_cache and umap_cache[task_id].get('status') == 'completed':
+            return jsonify(umap_cache[task_id]['result'])
+        
+        # Check if task is already running
+        if task_id in umap_cache and umap_cache[task_id].get('status') == 'running':
+            return jsonify({"success": False, "status": "running", "message": "UMAP generation in progress"})
+
+        # Get data for UMAP generation
+        results = collection.get(include=["embeddings", "metadatas"])
+        embeddings = results["embeddings"]
+        metadatas = results["metadatas"]
+
+        if len(embeddings) == 0:
+            return jsonify({"success": False, "error": "No vectors found in collection"})
+
+        # Mark task as running
+        umap_cache[task_id] = {"status": "running", "start_time": asyncio.get_event_loop().time()}
+
+        # Start background task with timeout
+        loop = asyncio.get_event_loop()
+        
+        # Wrap the sync function with timeout handling
+        async def run_with_timeout():
+            try:
+                # Run with a 5-minute timeout
+                future = loop.run_in_executor(executor, generate_umap_sync, embeddings, metadatas)
+                result = await asyncio.wait_for(future, timeout=300.0)  # 5 minutes
+                return result
+            except asyncio.TimeoutError:
+                return {"success": False, "error": "UMAP generation timed out after 5 minutes"}
+            except Exception as e:
+                return {"success": False, "error": f"UMAP generation failed: {str(e)}"}
+
+        # Create task but don't await it
+        task = asyncio.create_task(run_with_timeout())
+        
+        def on_complete(task_future):
+            try:
+                result = task_future.result()
+                umap_cache[task_id] = {"status": "completed", "result": result}
+            except Exception as e:
+                umap_cache[task_id] = {
+                    "status": "completed", 
+                    "result": {"success": False, "error": str(e)}
+                }
+
+        task.add_done_callback(on_complete)
+
+        return jsonify({"success": False, "status": "started", "message": "UMAP generation started"})
+
+    except Exception as e:
         return jsonify({"success": False, "error": str(e)})
+
+
+@app.route('/umap-status/<task_id>')
+async def umap_status(task_id):
+    """Check the status of UMAP generation"""
+    if task_id not in umap_cache:
+        return jsonify({"success": False, "error": "Task not found"})
+    
+    task_data = umap_cache[task_id]
+    
+    if task_data["status"] == "running":
+        return jsonify({"success": False, "status": "running", "message": "UMAP generation in progress"})
+    elif task_data["status"] == "completed":
+        return jsonify(task_data["result"])
+    else:
+        return jsonify({"success": False, "error": "Unknown task status"})
 
 
 @app.route('/create-collection', methods=['POST'])
@@ -331,4 +448,7 @@ async def create_collection_page():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    try:
+        app.run(debug=True)
+    finally:
+        executor.shutdown(wait=True)
