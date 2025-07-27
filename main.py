@@ -178,13 +178,13 @@ async def upload_data():
     files = await request.files
     if 'data_file' not in files:
         await flash("No file uploaded.", "danger")
-        return redirect(url_for('index'))
+        return redirect(url_for('browse_vectors'))
 
     file = files['data_file']
 
     if file.filename == '':
         await flash("No selected file.", "danger")
-        return redirect(url_for('index'))
+        return redirect(url_for('browse_vectors'))
 
     filename = file.filename.lower()
 
@@ -215,7 +215,7 @@ async def upload_data():
 
         else:
             await flash("Unsupported file type. Please upload a .csv or .h5 file.", "danger")
-            return redirect(url_for('index'))
+            return redirect(url_for('browse_vectors'))
 
         # Batch upload to Chroma
         batch_size = 100
@@ -232,7 +232,7 @@ async def upload_data():
         print("Upload error:", e)
         await flash(f"Error processing file: {str(e)}", "danger")
 
-    return redirect(url_for('index'))
+    return redirect(url_for('browse_vectors'))
 
 
 @app.route('/browse-vectors')

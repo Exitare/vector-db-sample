@@ -35,6 +35,80 @@
 </div>
 
 <div class="container">
+    <!-- Data Import Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card animate-fade-in border-0 shadow-sm">
+                <div class="card-header bg-primary text-white border-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-upload me-2"></i>
+                        Import Research Data
+                    </h4>
+                    <p class="mb-0 opacity-90">Upload your vector embeddings from CSV or HDF5 files</p>
+                </div>
+                <div class="card-body">
+                    <form action="/upload-data" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        <div class="row align-items-end">
+                            <div class="col-lg-8 mb-3">
+                                <label for="data_file" class="form-label fw-semibold">
+                                    <i class="fas fa-file-csv text-primary me-1"></i>
+                                    Select Data File
+                                </label>
+                                <input type="file" 
+                                       class="form-control form-control-lg" 
+                                       id="data_file" 
+                                       name="data_file" 
+                                       accept=".csv,.h5,.hdf5"
+                                       required>
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle text-muted me-1"></i>
+                                    Supported formats: CSV, HDF5 (.h5, .hdf5)
+                                </div>
+                                <div class="invalid-feedback">
+                                    Please select a valid data file.
+                                </div>
+                            </div>
+                            <div class="col-lg-4 mb-3">
+                                <button type="submit" class="btn btn-primary btn-lg w-100">
+                                    <i class="fas fa-cloud-upload-alt me-2"></i>
+                                    Upload Data
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- File Format Info -->
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <div class="glass-effect p-3 rounded">
+                                    <h6 class="fw-bold text-primary mb-2">
+                                        <i class="fas fa-file-csv me-1"></i>CSV Format
+                                    </h6>
+                                    <ul class="small mb-0 text-muted">
+                                        <li><code>submitter_ids</code>: Unique identifiers</li>
+                                        <li><code>X</code>: Comma-separated embedding values</li>
+                                        <li><code>y</code>: Category/label information</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="glass-effect p-3 rounded">
+                                    <h6 class="fw-bold text-success mb-2">
+                                        <i class="fas fa-database me-1"></i>HDF5 Format
+                                    </h6>
+                                    <ul class="small mb-0 text-muted">
+                                        <li><code>/submitter_ids</code>: ID dataset</li>
+                                        <li><code>/X</code>: Embedding matrix</li>
+                                        <li><code>/y</code>: Label dataset</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Analytics Dashboard -->
     <div class="row mb-5">
         <div class="col-lg-6 mb-4">
@@ -188,4 +262,53 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{{ url_for('static', filename='js/chart_loader.js') }}"></script>
 <script src="{{ url_for('static', filename='js/umap_loader.js') }}"></script>
+
+<script>
+// Form validation and upload handling
+(function() {
+    'use strict';
+    
+    // Bootstrap form validation
+    const forms = document.querySelectorAll('.needs-validation');
+    Array.from(forms).forEach(form => {
+        form.addEventListener('submit', event => {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            } else {
+                // Show upload progress
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Uploading...';
+                submitBtn.disabled = true;
+                
+                // Re-enable button after some time in case of error
+                setTimeout(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }, 30000);
+            }
+            form.classList.add('was-validated');
+        });
+    });
+    
+    // File input change handler
+    const fileInput = document.getElementById('data_file');
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                const fileInfo = document.querySelector('.form-text');
+                if (fileInfo) {
+                    fileInfo.innerHTML = `
+                        <i class="fas fa-file text-success me-1"></i>
+                        Selected: <strong>${file.name}</strong> (${fileSize} MB)
+                    `;
+                }
+            }
+        });
+    }
+})();
+</script>
 {% endblock %}
