@@ -5,6 +5,7 @@ import os
 import h5py
 import json
 from collections import Counter
+from datetime import datetime
 import matplotlib
 matplotlib.use('Agg')  # Set non-interactive backend before importing pyplot
 import matplotlib.colors as mcolors
@@ -34,9 +35,23 @@ collection = chroma_client.get_or_create_collection("heterogeneous_vectors")
 @app.route('/', methods=['GET'])
 async def index():
     collections = chroma_client.list_collections()
-    collection_names = [col.name for col in collections]
-    return await render_template("index.html", collections=collection_names,
-                                 current_collection=collection.name)
+    
+    # Create enhanced collection info with metadata
+    collections_info = []
+    for col in collections:
+        collections_info.append({
+            'name': col.name,
+            'metadata': getattr(col, 'metadata', None)
+        })
+    
+    # Get current collection metadata
+    current_collection_metadata = getattr(collection, 'metadata', None)
+    
+    return await render_template("index.html", 
+                                 collections=[col.name for col in collections],  # Keep backward compatibility
+                                 collections_info=collections_info,
+                                 current_collection=collection.name,
+                                 current_collection_metadata=current_collection_metadata)
 
 
 @app.route('/set-collection', methods=['POST'])
@@ -418,18 +433,75 @@ async def umap_status(task_id):
 async def create_collection():
     form = await request.form
     name = form.get('new_collection_name', '').strip()
-    metadata = form.get('collection_metadata', '').strip()
+    
+    # Get standard metadata fields
+    source = form.get('source', '').strip()
+    description = form.get('description', '').strip()
+    version = form.get('version', '').strip()
+    created_by = form.get('created_by', '').strip()
+    additional_metadata = form.get('additional_metadata', '').strip()
 
     if not name:
         await flash("Collection name is required.", "danger")
         return redirect(url_for('create_collection_page'))
 
     try:
-        meta = json.loads(metadata) if metadata else None
-        chroma_client.create_collection(name=name, metadata=meta)
-        await flash(f"Collection '{name}' created successfully.", "success")
+        # Start with standard metadata fields
+        metadata = {}
+        
+        # Add standard fields if provided
+        if source:
+            metadata['source'] = source
+        if description:
+            metadata['description'] = description
+        if version:
+            metadata['version'] = version
+        if created_by:
+            metadata['created_by'] = created_by
+        
+        # Add creation timestamp
+        from datetime import datetime
+        metadata['created_at'] = datetime.now().isoformat()
+        
+        # Parse and merge additional JSON metadata if provided
+        if additional_metadata:
+            try:
+                additional_json = json.loads(additional_metadata)
+                if isinstance(additional_json, dict):
+                    # Merge additional metadata, with additional_json taking precedence for duplicates
+                    metadata.update(additional_json)
+                else:
+                    await flash("Additional metadata must be a valid JSON object.", "danger")
+                    return redirect(url_for('create_collection_page'))
+            except json.JSONDecodeError as e:
+                await flash(f"Invalid JSON format in additional metadata: {str(e)}", "danger")
+                return redirect(url_for('create_collection_page'))
+        
+        # Create collection with merged metadata (None if empty)
+        final_metadata = metadata if metadata else None
+        chroma_client.create_collection(name=name, metadata=final_metadata)
+        
+        # Create success message with metadata summary
+        metadata_summary = []
+        if source:
+            metadata_summary.append(f"Source: {source}")
+        if version:
+            metadata_summary.append(f"Version: {version}")
+        if created_by:
+            metadata_summary.append(f"Created by: {created_by}")
+        
+        success_msg = f"Collection '{name}' created successfully."
+        if metadata_summary:
+            success_msg += f" ({', '.join(metadata_summary)})"
+        
+        await flash(success_msg, "success")
+        
     except Exception as e:
-        await flash(f"Error creating collection: {e}", "danger")
+        error_msg = str(e)
+        if "already exists" in error_msg.lower():
+            await flash(f"Collection '{name}' already exists. Please choose a different name.", "danger")
+        else:
+            await flash(f"Error creating collection: {error_msg}", "danger")
 
     return redirect(url_for('index'))
 

@@ -55,17 +55,79 @@
                             </div>
                         </div>
 
+                        <!-- Standard Metadata Fields -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="source" class="form-label fw-semibold">
+                                    <i class="fas fa-database me-1"></i>Source
+                                    <span class="badge bg-secondary ms-2">Optional</span>
+                                </label>
+                                <input type="text" class="form-control" 
+                                       id="source" name="source" 
+                                       placeholder="e.g., experiment_1, clinical_trial_2024">
+                                <div class="form-text">
+                                    Data source or experiment identifier
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="version" class="form-label fw-semibold">
+                                    <i class="fas fa-code-branch me-1"></i>Version
+                                    <span class="badge bg-secondary ms-2">Optional</span>
+                                </label>
+                                <input type="text" class="form-control" 
+                                       id="version" name="version" 
+                                       placeholder="e.g., 1.0, v2.1, beta">
+                                <div class="form-text">
+                                    Version or iteration number
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="mb-4">
-                            <label for="collection_metadata" class="form-label fw-semibold">
-                                <i class="fas fa-code me-1"></i>Collection Metadata
+                            <label for="created_by" class="form-label fw-semibold">
+                                <i class="fas fa-user me-1"></i>Created By
                                 <span class="badge bg-secondary ms-2">Optional</span>
                             </label>
-                            <textarea class="form-control" id="collection_metadata" 
-                                      name="collection_metadata" rows="6" 
-                                      placeholder='{"source": "experiment_1", "description": "Initial embeddings dataset", "version": "1.0", "created_by": "researcher_name"}'></textarea>
+                            <input type="text" class="form-control" 
+                                   id="created_by" name="created_by" 
+                                   placeholder="e.g., Dr. Smith, research_team_alpha">
                             <div class="form-text">
-                                <i class="fas fa-lightbulb me-1"></i>
-                                Add metadata in JSON format to help identify and organize your collection
+                                Name or identifier of the creator
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="description" class="form-label fw-semibold">
+                                <i class="fas fa-file-alt me-1"></i>Description
+                                <span class="badge bg-secondary ms-2">Optional</span>
+                            </label>
+                            <textarea class="form-control" id="description" 
+                                      name="description" rows="3" 
+                                      placeholder="Describe the purpose and contents of this collection..."></textarea>
+                            <div class="form-text">
+                                Brief description of the collection's purpose and contents
+                            </div>
+                        </div>
+
+                        <!-- Advanced JSON Metadata -->
+                        <div class="card bg-light border-0 mb-4">
+                            <div class="card-header bg-transparent border-0 pb-2">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-cogs me-1"></i>Advanced Metadata
+                                    <span class="badge bg-info ms-2">Optional JSON</span>
+                                </h6>
+                            </div>
+                            <div class="card-body pt-2">
+                                <label for="additional_metadata" class="form-label fw-semibold">
+                                    <i class="fas fa-code me-1"></i>Additional JSON Metadata
+                                </label>
+                                <textarea class="form-control font-monospace" id="additional_metadata" 
+                                          name="additional_metadata" rows="4" 
+                                          placeholder='{"experiment_id": "EXP001", "lab": "Genomics Lab", "data_type": "RNA-seq", "sample_count": 1000}'></textarea>
+                                <div class="form-text">
+                                    <i class="fas fa-lightbulb me-1"></i>
+                                    Additional metadata in JSON format. This will be merged with the fields above.
+                                </div>
                             </div>
                         </div>
 
@@ -99,13 +161,30 @@
                             </ul>
                         </div>
                         <div class="col-md-6">
-                            <h6 class="fw-semibold">Metadata Examples</h6>
+                            <h6 class="fw-semibold">Metadata Field Examples</h6>
                             <ul class="list-unstyled small">
-                                <li><i class="fas fa-tag me-1"></i> Research project name</li>
-                                <li><i class="fas fa-calendar me-1"></i> Creation date</li>
-                                <li><i class="fas fa-user me-1"></i> Researcher information</li>
-                                <li><i class="fas fa-info me-1"></i> Dataset description</li>
+                                <li><i class="fas fa-database me-1 text-primary"></i> <strong>Source:</strong> experiment_001, clinical_study</li>
+                                <li><i class="fas fa-code-branch me-1 text-success"></i> <strong>Version:</strong> 1.0, v2.1-beta, final</li>
+                                <li><i class="fas fa-user me-1 text-info"></i> <strong>Created By:</strong> Dr. Smith, team_alpha</li>
+                                <li><i class="fas fa-file-alt me-1 text-warning"></i> <strong>Description:</strong> Brief purpose summary</li>
                             </ul>
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-3 border-top">
+                        <h6 class="fw-semibold">
+                            <i class="fas fa-code me-1"></i>Advanced JSON Metadata
+                        </h6>
+                        <p class="small text-muted mb-2">
+                            The additional JSON metadata field allows you to add any custom fields that will be merged with the standard fields above. Example:
+                        </p>
+                        <div class="bg-dark text-light p-2 rounded font-monospace small">
+{<br>
+&nbsp;&nbsp;"experiment_id": "EXP_2024_001",<br>
+&nbsp;&nbsp;"lab": "Computational Biology Lab",<br>
+&nbsp;&nbsp;"data_type": "RNA-seq embeddings",<br>
+&nbsp;&nbsp;"sample_count": 1500,<br>
+&nbsp;&nbsp;"processing_date": "2024-01-15"<br>
+}
                         </div>
                     </div>
                 </div>

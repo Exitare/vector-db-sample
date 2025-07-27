@@ -22,7 +22,35 @@
             <div class="col-lg-4 text-center">
                 <div class="stats-card">
                     <h3 class="fw-bold mb-1">{{ current_collection }}</h3>
-                    <p class="mb-0 opacity-90">Active Collection</p>
+                    <p class="mb-2 opacity-90">Active Collection</p>
+                    
+                    {% if current_collection_metadata %}
+                    <div class="collection-metadata mt-2">
+                        {% if current_collection_metadata.version %}
+                        <div class="badge bg-primary bg-opacity-75 me-1 mb-1">
+                            <i class="fas fa-code-branch me-1"></i>{{ current_collection_metadata.version }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if current_collection_metadata.source %}
+                        <div class="badge bg-info bg-opacity-75 me-1 mb-1">
+                            <i class="fas fa-database me-1"></i>{{ current_collection_metadata.source }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if current_collection_metadata.created_by %}
+                        <div class="badge bg-success bg-opacity-75 me-1 mb-1">
+                            <i class="fas fa-user me-1"></i>{{ current_collection_metadata.created_by }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if current_collection_metadata.description %}
+                        <div class="small text-light opacity-75 mt-2">
+                            {{ current_collection_metadata.description[:60] }}{% if current_collection_metadata.description|length > 60 %}...{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -53,12 +81,35 @@
                         <div class="col-md-8">
                             <label for="collection_name" class="form-label fw-semibold">Select Collection</label>
                             <select class="form-select" id="collection_name" name="collection_name" required>
-                                {% for name in collections %}
-                                <option value="{{ name }}" {% if name == current_collection %}selected{% endif %}>
-                                    {{ name }}
+                                {% for col_info in collections_info %}
+                                <option value="{{ col_info.name }}" {% if col_info.name == current_collection %}selected{% endif %}>
+                                    {{ col_info.name }}
+                                    {% if col_info.metadata %}
+                                        {% if col_info.metadata.version %} (v{{ col_info.metadata.version }}){% endif %}
+                                        {% if col_info.metadata.source %} - {{ col_info.metadata.source }}{% endif %}
+                                    {% endif %}
                                 </option>
                                 {% endfor %}
                             </select>
+                            {% if collections_info and current_collection_metadata %}
+                            <div class="form-text mt-2">
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% if current_collection_metadata.created_by %}
+                                    <span class="badge bg-light text-dark">
+                                        <i class="fas fa-user me-1"></i>{{ current_collection_metadata.created_by }}
+                                    </span>
+                                    {% endif %}
+                                    {% if current_collection_metadata.created_at %}
+                                    <span class="badge bg-light text-dark">
+                                        <i class="fas fa-calendar me-1"></i>{{ current_collection_metadata.created_at[:10] }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                {% if current_collection_metadata.description %}
+                                <div class="small text-muted mt-1">{{ current_collection_metadata.description }}</div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                         </div>
                         <div class="col-md-4">
                             <button type="submit" class="btn btn-primary w-100">
