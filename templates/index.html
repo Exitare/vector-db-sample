@@ -1,78 +1,212 @@
 {% extends "base.html" %}
 
-{% block title %}Vector Database Interface{% endblock %}
+{% block title %}Vector Research Platform - Dashboard{% endblock %}
 
 {% block content %}
 
-<!-- Switch Collection Form -->
-<div class="d-flex justify-content-between align-items-center mt-3">
-    <h2>Current Collection: <span class="text-primary">{{ current_collection }}</span></h2>
-    <a href="/create-collection" class="btn btn-outline-primary">
-        <i class="fas fa-plus-circle me-1"></i> New Collection
-    </a>
+<!-- Hero Section -->
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="research-badge">
+                    <i class="fas fa-microscope me-1"></i>
+                    Research Platform
+                </div>
+                <h1 class="display-4 fw-bold mb-3">Vector Database Explorer</h1>
+                <p class="lead opacity-90">
+                    Advanced vector similarity search and exploration platform for research applications.
+                    Analyze high-dimensional data with state-of-the-art embedding techniques.
+                </p>
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="stats-card">
+                    <h3 class="fw-bold mb-1">{{ current_collection }}</h3>
+                    <p class="mb-0 opacity-90">Active Collection</p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-<form action="/set-collection" method="post" class="card p-4 shadow-sm mb-4 mt-3">
-    <div class="mb-3">
-        <label for="collection_name" class="form-label">Select Collection</label>
-        <select class="form-select" id="collection_name" name="collection_name" required>
-            {% for name in collections %}
-            <option value="{{ name }}" {% if name == current_collection %}selected{% endif %}>{{ name }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <button type="submit" class="btn btn-primary">Switch Collection</button>
-</form>
 
-<!-- Upload CSV/HDF5 Form -->
-<h3 class="mb-4">Upload CSV or HDF5 to Add Vectors</h3>
-<form action="/upload-data" method="post" enctype="multipart/form-data" class="card p-4 shadow-sm mb-4">
-    <div class="mb-3">
-        <label for="data_file" class="form-label">Select File</label>
-        <input class="form-control" type="file" id="data_file" name="data_file" accept=".csv,.h5,.hdf5" required>
+<div class="container">
+    <!-- Collection Management Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="card-title mb-1">
+                                <i class="fas fa-database text-primary me-2"></i>
+                                Collection Management
+                            </h4>
+                            <p class="text-muted mb-0">Switch between collections or create new ones</p>
+                        </div>
+                        <a href="/create-collection" class="btn btn-outline-primary">
+                            <i class="fas fa-plus-circle me-1"></i> New Collection
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form action="/set-collection" method="post" class="row align-items-end">
+                        <div class="col-md-8">
+                            <label for="collection_name" class="form-label fw-semibold">Select Collection</label>
+                            <select class="form-select" id="collection_name" name="collection_name" required>
+                                {% for name in collections %}
+                                <option value="{{ name }}" {% if name == current_collection %}selected{% endif %}>
+                                    {{ name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-exchange-alt me-1"></i>Switch Collection
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
-    <button type="submit" class="btn btn-secondary">Upload File</button>
-</form>
 
-<!-- Search Form -->
-<h3 class="mt-5 mb-4">Search Similar Vectors</h3>
-<form action="/search-vector" method="post" class="card p-4 shadow-sm mb-4">
-    <div class="mb-3">
-        <label for="query_vector" class="form-label">Search Vector (comma-separated)</label>
-        <input type="text" class="form-control" id="query_vector" name="query_vector"
-               placeholder="e.g. 0.1,0.2,0.3,0.4" required>
+    <!-- Data Upload Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-upload text-success me-2"></i>
+                        Data Import
+                    </h4>
+                    <p class="text-muted mb-0">Upload CSV or HDF5 files to add vectors to your collection</p>
+                </div>
+                <div class="card-body">
+                    <form action="/upload-data" method="post" enctype="multipart/form-data" class="row align-items-end">
+                        <div class="col-md-8">
+                            <label for="data_file" class="form-label fw-semibold">Select File</label>
+                            <input class="form-control" type="file" id="data_file" name="data_file" 
+                                   accept=".csv,.h5,.hdf5" required>
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Supported formats: CSV, HDF5 (.h5, .hdf5)
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-secondary w-100">
+                                <i class="fas fa-cloud-upload-alt me-1"></i>Upload File
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
-    <button type="submit" class="btn btn-success">Search</button>
-</form>
 
-<!-- Search Results -->
-{% if results %}
-<h4 class="mt-4">Search Results</h4>
-<table class="table table-bordered table-striped mt-3">
-    <thead>
-    <tr>
-        <th>ID</th>
-        <th>Document</th>
-        <th>Metadata</th>
-        <th>Distance</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for result in results %}
-    <tr>
-        <td>{{ result.id }}</td>
-        <td>{{ result.document }}</td>
-        <td>
-            {% if result.metadata %}
-            <pre class="mb-0">{{ result.metadata | tojson(indent=0) }}</pre>
-            {% else %}
-            &mdash;
-            {% endif %}
-        </td>
-        <td>{{ "%.4f"|format(result.distance) }}</td>
-    </tr>
-    {% endfor %}
-    </tbody>
-</table>
-{% endif %}
+    <!-- Search Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-search text-info me-2"></i>
+                        Vector Similarity Search
+                    </h4>
+                    <p class="text-muted mb-0">Find similar vectors using cosine similarity or other metrics</p>
+                </div>
+                <div class="card-body">
+                    <form action="/search-vector" method="post" class="row align-items-end">
+                        <div class="col-md-8">
+                            <label for="query_vector" class="form-label fw-semibold">Query Vector</label>
+                            <input type="text" class="form-control" id="query_vector" name="query_vector"
+                                   placeholder="Enter comma-separated values (e.g., 0.1, 0.2, 0.3, 0.4)" required>
+                            <div class="form-text">
+                                <i class="fas fa-lightbulb me-1"></i>
+                                Enter your query vector as comma-separated float values
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-search me-1"></i>Search Similar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Results -->
+    {% if results %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-chart-line text-warning me-2"></i>
+                        Search Results
+                    </h4>
+                    <p class="text-muted mb-0">Most similar vectors ranked by distance</p>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                            <tr>
+                                <th class="px-4 py-3">
+                                    <i class="fas fa-hashtag me-1"></i>ID
+                                </th>
+                                <th class="py-3">
+                                    <i class="fas fa-file-text me-1"></i>Document
+                                </th>
+                                <th class="py-3">
+                                    <i class="fas fa-tags me-1"></i>Metadata
+                                </th>
+                                <th class="py-3">
+                                    <i class="fas fa-ruler me-1"></i>Distance
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for result in results %}
+                            <tr>
+                                <td class="px-4 py-3">
+                                    <span class="badge bg-primary">{{ result.id }}</span>
+                                </td>
+                                <td class="py-3">
+                                    <div class="text-truncate" style="max-width: 300px;" title="{{ result.document }}">
+                                        {{ result.document }}
+                                    </div>
+                                </td>
+                                <td class="py-3">
+                                    {% if result.metadata %}
+                                    <div class="glass-effect p-2 rounded">
+                                        <pre class="mb-0 small text-muted">{{ result.metadata | tojson(indent=2) }}</pre>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress me-2" style="width: 100px; height: 8px;">
+                                            <div class="progress-bar bg-success" 
+                                                 style="width: {{ ((1 - result.distance) * 100) | round(1) }}%"></div>
+                                        </div>
+                                        <span class="fw-semibold text-success">{{ "%.4f"|format(result.distance) }}</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
 
 {% endblock %}

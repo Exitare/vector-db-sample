@@ -1,23 +1,116 @@
 {% extends "base.html" %}
 
-{% block title %}Create New Collection{% endblock %}
+{% block title %}Create New Collection - Vector Research Platform{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Create a New Collection</h2>
 
-<form action="/create-collection" method="post" class="card p-4 shadow-sm">
-    <div class="mb-3">
-        <label for="new_collection_name" class="form-label">Collection Name</label>
-        <input type="text" class="form-control" id="new_collection_name" name="new_collection_name" required placeholder="e.g. my_embeddings_v1">
+<!-- Hero Section -->
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="research-badge">
+                    <i class="fas fa-plus-circle me-1"></i>
+                    Collection Creator
+                </div>
+                <h1 class="display-4 fw-bold mb-3">Create New Collection</h1>
+                <p class="lead opacity-90">
+                    Initialize a new vector collection for your research data. 
+                    Collections help organize and manage different datasets.
+                </p>
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="stats-card">
+                    <i class="fas fa-database fa-3x mb-3"></i>
+                    <h5 class="mb-0">New Collection</h5>
+                </div>
+            </div>
+        </div>
     </div>
+</div>
 
-    <div class="mb-3">
-        <label for="collection_metadata" class="form-label">Optional Metadata (JSON format)</label>
-        <textarea class="form-control" id="collection_metadata" name="collection_metadata" rows="3" placeholder='{"source": "experiment_1", "note": "initial set"}'></textarea>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-cog text-primary me-2"></i>
+                        Collection Configuration
+                    </h4>
+                    <p class="text-muted mb-0">Set up your new vector collection with metadata</p>
+                </div>
+                <div class="card-body">
+                    <form action="/create-collection" method="post">
+                        <div class="mb-4">
+                            <label for="new_collection_name" class="form-label fw-semibold">
+                                <i class="fas fa-tag me-1"></i>Collection Name
+                            </label>
+                            <input type="text" class="form-control form-control-lg" 
+                                   id="new_collection_name" name="new_collection_name" 
+                                   required placeholder="e.g., medical_embeddings_v1">
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Choose a descriptive name for your collection (alphanumeric and underscores only)
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="collection_metadata" class="form-label fw-semibold">
+                                <i class="fas fa-code me-1"></i>Collection Metadata
+                                <span class="badge bg-secondary ms-2">Optional</span>
+                            </label>
+                            <textarea class="form-control" id="collection_metadata" 
+                                      name="collection_metadata" rows="6" 
+                                      placeholder='{"source": "experiment_1", "description": "Initial embeddings dataset", "version": "1.0", "created_by": "researcher_name"}'></textarea>
+                            <div class="form-text">
+                                <i class="fas fa-lightbulb me-1"></i>
+                                Add metadata in JSON format to help identify and organize your collection
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-arrow-left me-1"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-plus-circle me-1"></i>Create Collection
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Help Section -->
+            <div class="card mt-4 glass-effect animate-fade-in">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-question-circle text-info me-2"></i>
+                        Collection Guidelines
+                    </h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-semibold">Naming Best Practices</h6>
+                            <ul class="list-unstyled small">
+                                <li><i class="fas fa-check text-success me-1"></i> Use descriptive names</li>
+                                <li><i class="fas fa-check text-success me-1"></i> Include version numbers</li>
+                                <li><i class="fas fa-check text-success me-1"></i> Use underscores for spaces</li>
+                                <li><i class="fas fa-times text-danger me-1"></i> Avoid special characters</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-semibold">Metadata Examples</h6>
+                            <ul class="list-unstyled small">
+                                <li><i class="fas fa-tag me-1"></i> Research project name</li>
+                                <li><i class="fas fa-calendar me-1"></i> Creation date</li>
+                                <li><i class="fas fa-user me-1"></i> Researcher information</li>
+                                <li><i class="fas fa-info me-1"></i> Dataset description</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-
-    <button type="submit" class="btn btn-primary">Create Collection</button>
-</form>
-
-<a href="/" class="btn btn-link mt-4"><i class="fas fa-arrow-left me-1"></i>Back to Home</a>
+</div>
 {% endblock %}
