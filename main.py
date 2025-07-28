@@ -371,6 +371,70 @@ async def api_vectors_3d():
         }), 500
 
 
+@app.route('/api/nearest-neighbors/<vector_id>')
+async def api_nearest_neighbors(vector_id):
+    """API endpoint to find nearest neighbors for a specific vector"""
+    start_time = time.time()
+    
+    try:
+        # Get the specific vector by ID
+        results = collection.get(
+            ids=[vector_id],
+            include=["embeddings", "metadatas", "documents"]
+        )
+        
+        if not results['ids'] or len(results['ids']) == 0:
+            API_ERRORS.labels(endpoint='nearest-neighbors', error_type='NotFound').inc()
+            return jsonify({
+                'success': False,
+                'error': f'Vector with ID {vector_id} not found'
+            }), 404
+        
+        # Get the embedding for the query vector
+        query_embedding = results['embeddings'][0]
+        
+        # Query for similar vectors
+        search_start = time.time()
+        similar_results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=10,  # Get top 10 similar vectors
+            include=['documents', 'metadatas', 'distances']
+        )
+        search_duration = time.time() - search_start
+        SEARCH_DURATION.observe(search_duration)
+        
+        # Format the results
+        hits = []
+        for i in range(len(similar_results["ids"][0])):
+            hits.append({
+                "id": similar_results["ids"][0][i],
+                "document": similar_results["documents"][0][i] if similar_results["documents"] and similar_results["documents"][0] else None,
+                "metadata": similar_results["metadatas"][0][i] if similar_results["metadatas"] and similar_results["metadatas"][0] else None,
+                "distance": similar_results["distances"][0][i],
+            })
+        
+        # Record successful nearest neighbors search
+        duration = time.time() - start_time
+        SEARCH_DURATION.observe(duration)
+        
+        return jsonify({
+            'success': True,
+            'query_vector_id': vector_id,
+            'results': hits
+        })
+        
+    except Exception as e:
+        # Record nearest neighbors error
+        duration = time.time() - start_time
+        SEARCH_DURATION.observe(duration)
+        API_ERRORS.labels(endpoint='nearest-neighbors', error_type=type(e).__name__).inc()
+        
+        return jsonify({
+            'success': False,
+            'error': f'Failed to find nearest neighbors: {str(e)}'
+        }), 500
+
+
 @app.route('/upload-data', methods=['POST'])
 async def upload_data():
     files = await request.files
@@ -477,6 +541,45 @@ async def browse_vectors():
     except Exception as e:
         await flash(f"Error loading vectors: {str(e)}", "danger")
         return redirect(url_for('index'))
+
+
+@app.route('/vectors-3d')
+async def vectors_3d():
+    """Dedicated 3D visualization page"""
+    # Track page view
+    user_agent = request.headers.get('User-Agent', 'Unknown')[:50]  # Truncate to avoid high cardinality
+    PAGE_VIEWS.labels(page='vectors-3d', user_agent=user_agent).inc()
+    
+    try:
+        results = collection.get(include=["embeddings", "metadatas", "documents"])
+
+        vectors = []
+        cancer_types = []
+
+        for i in range(len(results['ids'])):
+            metadata = results['metadatas'][i] if results['metadatas'] else None
+            cancer_type = metadata.get("y") if metadata else "Unknown"
+
+            vectors.append({
+                'id': results['ids'][i],
+                'embedding': results['embeddings'][i],
+                'metadata': metadata,
+                'document': results['documents'][i] if results['documents'] else None
+            })
+
+            cancer_types.append(cancer_type)
+
+        cancer_counts = dict(Counter(cancer_types))
+
+        return await render_template(
+            'vectors_3d.html',
+            vectors=vectors,
+            cancer_counts=cancer_counts
+        )
+
+    except Exception as e:
+        await flash(f"Error loading 3D vectors: {str(e)}", "danger")
+        return redirect(url_for('browse_vectors'))
 
 
 def generate_umap_sync(embeddings, metadatas):
