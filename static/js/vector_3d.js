@@ -1050,7 +1050,7 @@ class Vector3DVisualizer {
             // lg: 4 cards (12/4 = 3), md: 3 cards, sm: 2 cards
             colDiv.className = 'col-lg-3 col-md-4 col-sm-6 mb-3';
             colDiv.classList.add('animate-fade-in');
-            colDiv.style.animationDelay = `${index * 0.1}s`;
+            // Remove staggered animation delay - all cards should appear at once
             
             // Format metadata display
             let metadataDisplay = 'No metadata';
