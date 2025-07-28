@@ -18,7 +18,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 import time
-
+import argparse
 # Prometheus metrics
 from prometheus_client import Counter as PrometheusCounter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
@@ -725,7 +725,12 @@ async def create_collection_page():
 
 
 if __name__ == "__main__":
-    import os
+    parser = argparse.ArgumentParser(description="Run the Vector DB Application")
+    parser.add_argument('--port',"-p", type=int, default=5050, help='Port to run the application on')
+    
+    args = parser.parse_args()
+    port = args.port
+
     
     try:
         # Check if we're in production mode
@@ -755,9 +760,9 @@ if __name__ == "__main__":
         else:
             # Development mode - use Quart's development server
             print(f"🔧 Starting Vector DB Application in DEVELOPMENT mode")
-            print("   - Application: http://localhost:5000")
+            print(f"   - Application: http://localhost:{port}")
             print("   - Debug mode: enabled")
-            app.run(debug=True, host='0.0.0.0', port=5000)
+            app.run(debug=True, host='0.0.0.0', port=port)
             
     finally:
         executor.shutdown(wait=True)
