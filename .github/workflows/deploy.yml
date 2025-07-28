@@ -23,8 +23,8 @@ jobs:
 
       - name: Create .env file
         run: |
-          echo "GF_SECURITY_ADMIN_PASSWORD=admin123" >> ${{ secrets.GF_ADMIN_PASSWORD }}/.env
-          echo "GF_SECURITY_ADMIN_USER=admin" >> ${{ secrets.GF_ADMIN_USER }}/.env
+          echo "GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GF_ADMIN_PASSWORD }}" >> .env
+          echo "GF_SECURITY_ADMIN_USER=${{ secrets.GF_ADMIN_USER }}" >> .env
 
       - name: Deploy using Docker Compose
         uses: appleboy/ssh-action@v1.0.0
