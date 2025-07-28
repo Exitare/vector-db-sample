@@ -119,20 +119,23 @@ class Vector3DVisualizer {
     }
     
     setupCamera() {
-        // Force the container to have the correct dimensions
-        const containerStyles = window.getComputedStyle(this.container);
-        let width = this.container.clientWidth || parseInt(containerStyles.width) || 800;
-        let height = this.container.clientHeight || parseInt(containerStyles.height) || 600;
+        // Get container dimensions with proper fallbacks
+        const containerRect = this.container.getBoundingClientRect();
+        let width = containerRect.width || this.container.clientWidth || 800;
+        let height = containerRect.height || this.container.clientHeight || 600;
         
-        // For fullscreen 3D page, ensure we use viewport dimensions
-        const isFullscreen = this.container.classList.contains('vector-3d-container') && 
-                            this.container.parentElement.classList.contains('vector-3d-fullscreen');
+        // Ensure width doesn't exceed container bounds
+        const maxWidth = this.container.parentElement ? this.container.parentElement.clientWidth : window.innerWidth;
+        width = Math.min(width, maxWidth);
         
-        if (isFullscreen) {
-            // Calculate 95vh for fullscreen mode
-            height = Math.floor(window.innerHeight * 0.95);
-            width = Math.max(width, window.innerWidth - 40); // Account for margins
+        // For the 3D visualization, use container height or calculate from viewport
+        if (height < 400) {
+            height = Math.max(500, Math.floor(window.innerHeight * 0.6));
         }
+        
+        console.log(`Camera setup - Container dimensions: ${width}x${height}`);
+        console.log(`Container rect:`, containerRect);
+        console.log(`Max width constraint:`, maxWidth);
         
         this.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
         this.camera.position.set(15, 15, 15);
@@ -140,35 +143,157 @@ class Vector3DVisualizer {
     }
     
     setupRenderer() {
-        // Force the container to have the correct dimensions
-        const containerStyles = window.getComputedStyle(this.container);
-        let width = this.container.clientWidth || parseInt(containerStyles.width) || 800;
-        let height = this.container.clientHeight || parseInt(containerStyles.height) || 600;
+        // Get container dimensions with proper fallbacks
+        const containerRect = this.container.getBoundingClientRect();
+        let width = containerRect.width || this.container.clientWidth || 800;
+        let height = containerRect.height || this.container.clientHeight || 600;
         
-        // For fullscreen 3D page, ensure we use viewport dimensions
-        const isFullscreen = this.container.classList.contains('vector-3d-container') && 
-                            this.container.parentElement.classList.contains('vector-3d-fullscreen');
+        // Ensure width doesn't exceed container bounds
+        const maxWidth = this.container.parentElement ? this.container.parentElement.clientWidth : window.innerWidth;
+        width = Math.min(width, maxWidth);
         
-        if (isFullscreen) {
-            // Calculate 95vh for fullscreen mode
-            height = Math.floor(window.innerHeight * 0.95);
-            width = Math.max(width, window.innerWidth - 40); // Account for margins
+        // For the 3D visualization, use container height or calculate from viewport
+        if (height < 400) {
+            height = Math.max(500, Math.floor(window.innerHeight * 0.6));
         }
         
-        console.log(`Setting up renderer with dimensions: ${width}x${height}`);
+        console.log(`Renderer setup - Using dimensions: ${width}x${height}`);
+        console.log(`Container rect:`, containerRect);
         console.log(`Container clientWidth: ${this.container.clientWidth}, clientHeight: ${this.container.clientHeight}`);
-        console.log(`Is fullscreen: ${isFullscreen}`);
+        console.log(`Max width constraint: ${maxWidth}, actual width: ${width}`);
         
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: true,
             alpha: true 
         });
         this.renderer.setSize(width, height);
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio to prevent overflow
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         
         this.container.appendChild(this.renderer.domElement);
+        
+        // Create UI panels after renderer is set up
+        this.createUIElements();
+    }
+    
+    createUIElements() {
+        // Create controls panel
+        this.createControlsPanel();
+        
+        // Legend panel will be created after data is loaded in createLegend()
+    }
+    
+    createControlsPanel() {
+        const controlsPanel = document.createElement('div');
+        controlsPanel.id = 'controls-panel-3d';
+        controlsPanel.className = 'controls-panel-3d';
+        controlsPanel.innerHTML = `
+            <h6 class="fw-bold mb-3">
+                <i class="fas fa-gamepad me-2 text-primary"></i>Controls
+            </h6>
+            <div class="small">
+                <div class="mb-2">
+                    <i class="fas fa-mouse-pointer me-2 text-info"></i>
+                    <strong>Click & Drag:</strong> Rotate view
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-search-plus me-2 text-success"></i>
+                    <strong>Scroll:</strong> Zoom in/out
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-hand-paper me-2 text-warning"></i>
+                    <strong>Right-click & Drag:</strong> Pan
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-dot-circle me-2 text-danger"></i>
+                    <strong>Click Point:</strong> Find similar vectors
+                </div>
+            </div>
+        `;
+        
+        // Append to body for fixed positioning
+        document.body.appendChild(controlsPanel);
+        
+        // Position it relative to the canvas with a small delay
+        setTimeout(() => {
+            this.positionPanel(controlsPanel, 'bottom-left');
+        }, 100);
+    }
+    
+    createLegendPanel(colorMap) {
+        // Remove any existing legend panel
+        const existingLegend = document.querySelector('#legend-panel-3d');
+        if (existingLegend) {
+            existingLegend.remove();
+        }
+        
+        const legendPanel = document.createElement('div');
+        legendPanel.id = 'legend-panel-3d';
+        legendPanel.className = 'legend-panel-3d';
+        legendPanel.innerHTML = `
+            <h6 class="fw-bold mb-3">
+                <i class="fas fa-palette me-2 text-primary"></i>Cancer Types
+            </h6>
+            <div id="legend-content-3d">
+                ${Object.entries(colorMap).map(([type, color]) => `
+                    <div class="legend-item" data-cancer-type="${type}">
+                        <span class="legend-color" style="background-color: ${color}; display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px;"></span>
+                        <span style="font-size: 0.8rem;">${type}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+        // Append to body for fixed positioning
+        document.body.appendChild(legendPanel);
+        
+        // Position it relative to the canvas with a small delay
+        setTimeout(() => {
+            this.positionPanel(legendPanel, 'bottom-right');
+        }, 100);
+    }
+    
+    positionPanel(panel, position) {
+        if (!this.renderer || !this.renderer.domElement) return;
+        
+        const canvas = this.renderer.domElement;
+        const canvasRect = canvas.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        
+        const padding = 20;
+        
+        // Calculate position based on canvas location
+        let left, top;
+        
+        if (position === 'bottom-left') {
+            left = canvasRect.left + scrollLeft + padding;
+            top = canvasRect.bottom + scrollTop - padding - panel.offsetHeight;
+        } else if (position === 'bottom-right') {
+            left = canvasRect.right + scrollLeft - padding - panel.offsetWidth;
+            top = canvasRect.bottom + scrollTop - padding - panel.offsetHeight;
+        }
+        
+        panel.style.position = 'absolute';
+        panel.style.left = left + 'px';
+        panel.style.top = top + 'px';
+        panel.style.zIndex = '1000';
+        
+        console.log(`Panel ${position} positioned at:`, { left, top, canvasRect });
+    }
+    
+    repositionPanels() {
+        const controlsPanel = document.querySelector('#controls-panel-3d');
+        const legendPanel = document.querySelector('#legend-panel-3d');
+        
+        if (controlsPanel) {
+            this.positionPanel(controlsPanel, 'bottom-left');
+        }
+        
+        if (legendPanel) {
+            this.positionPanel(legendPanel, 'bottom-right');
+        }
     }
     
     setupControls() {
@@ -514,20 +639,8 @@ class Vector3DVisualizer {
     createLegend(colorMap) {
         console.log('Creating legend with color map:', colorMap);
         
-        // Find the legend content div in the template
-        const legendContent = document.getElementById('legend-content');
-        if (!legendContent) {
-            console.error('Legend content div not found');
-            return;
-        }
-        
-        // Clear the loading message and populate with legend items
-        legendContent.innerHTML = Object.entries(colorMap).map(([type, color]) => `
-            <div class="legend-item" data-cancer-type="${type}">
-                <span class="legend-color" style="background-color: ${color}"></span>
-                <span>${type}</span>
-            </div>
-        `).join('');
+        // Create the dynamic legend panel
+        this.createLegendPanel(colorMap);
         
         console.log('Legend populated successfully');
     }
@@ -863,14 +976,21 @@ class Vector3DVisualizer {
         const results = document.getElementById('similar-vectors-results');  
         const error = document.getElementById('similar-vectors-error');
         const queryInfo = document.getElementById('similar-vectors-query-info');
+        const pageContainer = document.querySelector('.page-container');
         
         if (!section || !loading || !results || !error || !queryInfo) {
             console.warn('Similar vectors section elements not found');
             return;
         }
         
-        // Show the section
+        // Show the section and adjust layout
         section.style.display = 'block';
+        if (pageContainer) {
+            pageContainer.classList.add('showing-results');
+        }
+        
+        // Resize the 3D canvas to fit the new layout
+        this.onWindowResize();
         
         // Hide all states initially using CSS classes
         loading.style.display = 'none';
@@ -990,29 +1110,53 @@ class Vector3DVisualizer {
         this.renderer.render(this.scene, this.camera);
     }
     
+    hideSearchResults() {
+        const section = document.getElementById('similar-vectors-section');
+        const pageContainer = document.querySelector('.page-container');
+        
+        if (section) {
+            section.style.display = 'none';
+        }
+        
+        if (pageContainer) {
+            pageContainer.classList.remove('showing-results');
+        }
+        
+        // Resize the 3D canvas back to full size
+        this.onWindowResize();
+        
+        // Scroll back to top
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+    
     onWindowResize() {
         if (!this.container) return;
         
-        // Force the container to have the correct dimensions
-        const containerStyles = window.getComputedStyle(this.container);
-        let width = this.container.clientWidth || parseInt(containerStyles.width) || 800;
-        let height = this.container.clientHeight || parseInt(containerStyles.height) || 600;
+        // Get container dimensions with proper fallbacks
+        const containerRect = this.container.getBoundingClientRect();
+        let width = containerRect.width || this.container.clientWidth || 800;
+        let height = containerRect.height || this.container.clientHeight || 600;
         
-        // For fullscreen 3D page, ensure we use viewport dimensions
-        const isFullscreen = this.container.classList.contains('vector-3d-container') && 
-                            this.container.parentElement.classList.contains('vector-3d-fullscreen');
+        // Ensure width doesn't exceed container bounds
+        const maxWidth = this.container.parentElement ? this.container.parentElement.clientWidth : window.innerWidth;
+        width = Math.min(width, maxWidth);
         
-        if (isFullscreen) {
-            // Calculate 95vh for fullscreen mode
-            height = Math.floor(window.innerHeight * 0.95);
-            width = Math.max(width, window.innerWidth - 40); // Account for margins
+        // For the 3D visualization, use container height or calculate from viewport
+        if (height < 400) {
+            height = Math.max(500, Math.floor(window.innerHeight * 0.6));
         }
         
         console.log(`Window resize - updating to dimensions: ${width}x${height}`);
+        console.log(`Max width constraint: ${maxWidth}, actual width: ${width}`);
         
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(width, height);
+        
+        // Reposition UI panels after canvas resize
+        setTimeout(() => {
+            this.repositionPanels();
+        }, 100);
     }
     
     hideLoadingState() {
@@ -1056,6 +1200,17 @@ class Vector3DVisualizer {
     }
     
     destroy() {
+        // Remove UI panels from body
+        const controlsPanel = document.querySelector('#controls-panel-3d');
+        if (controlsPanel) {
+            controlsPanel.remove();
+        }
+        
+        const legendPanel = document.querySelector('#legend-panel-3d');
+        if (legendPanel) {
+            legendPanel.remove();
+        }
+        
         if (this.renderer) {
             this.container.removeChild(this.renderer.domElement);
         }
