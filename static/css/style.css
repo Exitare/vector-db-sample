@@ -116,8 +116,36 @@ div.hidden {
 }
 
 .data-table-responsive {
-    max-height: 600px;
+    max-height: 500px;
     overflow-y: auto;
+    border: 1px solid rgba(0, 0, 0, 0.125);
+    border-radius: 0.375rem;
+}
+
+/* Custom scrollbar for data table */
+.data-table-responsive::-webkit-scrollbar {
+    width: 8px;
+}
+
+.data-table-responsive::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.data-table-responsive::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.data-table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Ensure sticky header works in scrollable container */
+.data-table-responsive .sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .text-truncate-250 {
