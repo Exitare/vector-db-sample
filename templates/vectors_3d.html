@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}3D Vector Visualization - Vector Research Platform{% endblock %}
+
+{% block head %}
+
+{% endblock %}
+
+{% block content %}
+<!-- Back Navigation -->
+<div class="back-button">
+    <a href="{{ url_for('browse_vectors') }}" class="btn btn-outline-primary btn-lg">
+        <i class="fas fa-arrow-left me-2"></i>Back to Browse
+    </a>
+</div>
+
+
+<!-- Main 3D Visualization Container -->
+<div class="vector-3d-fullscreen">
+    <div id="vector-3d-container" class="vector-3d-container">
+
+        <!-- Loading Placeholder -->
+        <div id="vector-3d-placeholder" class="vector-3d-placeholder-full d-flex justify-content-center align-items-center">
+            <div class="text-center text-white">
+                <div class="spinner-border text-white mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h4 class="mb-2">Loading 3D Vector Space</h4>
+                <p class="mb-0">Preparing interactive visualization...</p>
+                <small class="opacity-75">This may take a moment for large datasets</small>
+            </div>
+        </div>
+
+        <!-- Controls Panel -->
+        <div class="controls-panel">
+            <h6 class="fw-bold mb-3">
+                <i class="fas fa-gamepad me-2 text-primary"></i>Controls
+            </h6>
+            <div class="small">
+                <div class="mb-2">
+                    <i class="fas fa-mouse-pointer me-2 text-info"></i>
+                    <strong>Click & Drag:</strong> Rotate view
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-search-plus me-2 text-success"></i>
+                    <strong>Scroll:</strong> Zoom in/out
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-hand-paper me-2 text-warning"></i>
+                    <strong>Right-click & Drag:</strong> Pan
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-dot-circle me-2 text-danger"></i>
+                    <strong>Click Point:</strong> Find similar vectors
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend Panel -->
+        <div class="legend-panel">
+            <h6 class="fw-bold mb-3">
+                <i class="fas fa-palette me-2 text-primary"></i>Cancer Types
+            </h6>
+            <div id="legend-content">
+                <div class="text-center text-muted">
+                    <small>Loading legend...</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Panel -->
+        <div class="stats-panel">
+            <h6 class="fw-bold mb-2">
+                <i class="fas fa-chart-bar me-2 text-primary"></i>Statistics
+            </h6>
+            <div class="small">
+                <div class="d-flex justify-content-between mb-1">
+                    <span>Total Vectors:</span>
+                    <span class="fw-bold" id="total-vectors">{{ vectors|length }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-1">
+                    <span>Cancer Types:</span>
+                    <span class="fw-bold" id="cancer-types-count">{{ cancer_counts|length }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Dimensions:</span>
+                    <span class="fw-bold">3D Projection</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Similar Vectors Section -->
+<div id="similar-vectors-section" class="results-section-fullscreen" style="display: none;">
+    <div class="container">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold mb-2">
+                <i class="fas fa-search text-success me-3"></i>
+                Similar Vectors Results
+            </h2>
+            <p id="similar-vectors-query-info" class="lead text-muted">Finding vectors similar to selected point...</p>
+        </div>
+        <div id="similar-vectors-loading" class="text-center py-5" style="display: none;">
+            <div class="spinner-border text-success mb-3" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h5 class="text-muted">Searching for similar vectors...</h5>
+            <p class="text-muted">Analyzing vector similarities using cosine distance</p>
+        </div>
+        <div id="similar-vectors-results" class="row">
+            <!-- Results will be dynamically populated here -->
+        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="similar-vectors-error" class="alert alert-danger d-flex align-items-center d-none" style="display: none !important;">
+            <i class="fas fa-exclamation-triangle me-3 fs-4"></i>
+            <div>
+                <h6 class="mb-1">Error Loading Results</h6>
+                <span class="error-message">Unable to find similar vectors</span>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <button class="btn btn-outline-primary" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+                <i class="fas fa-arrow-up me-2"></i>Back to 3D View
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Three.js & Custom -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
+<script src="{{ url_for('static', filename='js/vector_3d.js') }}"></script>
+{% endblock %}

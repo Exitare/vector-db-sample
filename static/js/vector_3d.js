@@ -5,22 +5,28 @@
  */
 
 class Vector3DVisualizer {
-    constructor(containerId) {
+    constructor(containerId, data) {
+        console.log('🚀 Initializing Vector3DVisualizer with data:', data);
         this.container = document.getElementById(containerId);
+        this.data = data;
         this.scene = null;
         this.camera = null;
         this.renderer = null;
-        this.controls = null;
-        this.points = null;
-        this.data = null;
+        this.raycaster = null;
+        this.mouse = null;
+        this.clickablePoints = []; // Array to store individual mesh objects
+        this.pointData = []; // Array to store corresponding data for each point
         
-        // Color palette for different cancer types
+        // Define a color palette for different cancer types
         this.colorPalette = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',
-            '#FF9FF3', '#54A0FF', '#5F27CD', '#00D2D3', '#FF9F43',
-            '#C44569', '#F8B500', '#6C5CE7', '#A29BFE', '#6C5B7B',
-            '#F39C12', '#E74C3C', '#9B59B6', '#3498DB', '#1ABC9C'
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+            '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#F4D03F'
         ];
+        
+        // Make this instance globally available for event delegation
+        window.vector3DVisualizer = this;
+        console.log('✅ Vector3DVisualizer instance assigned to window.vector3DVisualizer');
         
         this.init();
     }
@@ -113,8 +119,20 @@ class Vector3DVisualizer {
     }
     
     setupCamera() {
-        const width = this.container.clientWidth || 400;
-        const height = this.container.clientHeight || 400;
+        // Force the container to have the correct dimensions
+        const containerStyles = window.getComputedStyle(this.container);
+        let width = this.container.clientWidth || parseInt(containerStyles.width) || 800;
+        let height = this.container.clientHeight || parseInt(containerStyles.height) || 600;
+        
+        // For fullscreen 3D page, ensure we use viewport dimensions
+        const isFullscreen = this.container.classList.contains('vector-3d-container') && 
+                            this.container.parentElement.classList.contains('vector-3d-fullscreen');
+        
+        if (isFullscreen) {
+            // Calculate 95vh for fullscreen mode
+            height = Math.floor(window.innerHeight * 0.95);
+            width = Math.max(width, window.innerWidth - 40); // Account for margins
+        }
         
         this.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
         this.camera.position.set(15, 15, 15);
@@ -122,8 +140,24 @@ class Vector3DVisualizer {
     }
     
     setupRenderer() {
-        const width = this.container.clientWidth || 400;
-        const height = this.container.clientHeight || 400;
+        // Force the container to have the correct dimensions
+        const containerStyles = window.getComputedStyle(this.container);
+        let width = this.container.clientWidth || parseInt(containerStyles.width) || 800;
+        let height = this.container.clientHeight || parseInt(containerStyles.height) || 600;
+        
+        // For fullscreen 3D page, ensure we use viewport dimensions
+        const isFullscreen = this.container.classList.contains('vector-3d-container') && 
+                            this.container.parentElement.classList.contains('vector-3d-fullscreen');
+        
+        if (isFullscreen) {
+            // Calculate 95vh for fullscreen mode
+            height = Math.floor(window.innerHeight * 0.95);
+            width = Math.max(width, window.innerWidth - 40); // Account for margins
+        }
+        
+        console.log(`Setting up renderer with dimensions: ${width}x${height}`);
+        console.log(`Container clientWidth: ${this.container.clientWidth}, clientHeight: ${this.container.clientHeight}`);
+        console.log(`Is fullscreen: ${isFullscreen}`);
         
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: true,
@@ -140,12 +174,36 @@ class Vector3DVisualizer {
     setupControls() {
         console.log('Setting up controls...');
         
-        // For now, skip OrbitControls and just make it work without them
-        console.log('Skipping OrbitControls - visualization will work with basic camera');
-        this.controls = null;
-        
-        // Add basic mouse interaction without OrbitControls
-        this.addBasicMouseControls();
+        // Check if OrbitControls is available
+        if (typeof THREE.OrbitControls !== 'undefined') {
+            console.log('✅ OrbitControls found, setting up advanced camera controls');
+            this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+            
+            // Configure OrbitControls settings
+            this.controls.enableDamping = true;
+            this.controls.dampingFactor = 0.05;
+            this.controls.screenSpacePanning = false;
+            this.controls.minDistance = 3;
+            this.controls.maxDistance = 100;
+            this.controls.maxPolarAngle = Math.PI; // Allow full vertical rotation
+            this.controls.minPolarAngle = 0; // Allow full vertical rotation
+            
+            // Enable all types of controls
+            this.controls.enableRotate = true;
+            this.controls.enableZoom = true;
+            this.controls.enablePan = true;
+            
+            // Set rotation speed
+            this.controls.rotateSpeed = 1.0;
+            this.controls.zoomSpeed = 1.2;
+            this.controls.panSpeed = 0.8;
+            
+            console.log('OrbitControls configured successfully');
+        } else {
+            console.warn('⚠️ OrbitControls not found, falling back to basic mouse controls');
+            this.controls = null;
+            this.addBasicMouseControls();
+        }
     }
     
     addBasicMouseControls() {
@@ -240,9 +298,15 @@ class Vector3DVisualizer {
         
         console.log('Creating visualization with', this.data.length, 'data points');
         
+        // Debug: Log first few data points to understand structure
+        console.log('First data point:', this.data[0]);
+        console.log('Sample embedding:', this.data[0]?.embedding);
+        console.log('Embedding type:', typeof this.data[0]?.embedding);
+        console.log('Embedding is array:', Array.isArray(this.data[0]?.embedding));
+        
         try {
             // Get unique cancer types for color mapping
-            const cancerTypes = [...new Set(this.data.map(d => d.cancer_type))];
+            const cancerTypes = [...new Set(this.data.map(d => d?.cancer_type || 'Unknown').filter(Boolean))];
             console.log('Cancer types found:', cancerTypes);
             
             const colorMap = {};
@@ -258,7 +322,29 @@ class Vector3DVisualizer {
             const colors = [];
             
             // Extract positions and colors from data
-            this.data.forEach(point => {
+            this.data.forEach((point, index) => {
+                // Skip invalid points
+                if (!point || typeof point !== 'object') {
+                    console.warn(`Skipping invalid point at index ${index}:`, point);
+                    return;
+                }
+                
+                console.log(`Processing point ${index}:`, point);
+                
+                // Check if embedding exists and has required dimensions
+                if (!point.embedding || !Array.isArray(point.embedding)) {
+                    console.warn(`Point ${index} has invalid embedding:`, point.embedding);
+                    return; // Skip this point
+                }
+                
+                if (point.embedding.length < 3) {
+                    console.warn(`Point ${index} embedding has less than 3 dimensions:`, point.embedding.length);
+                    // Pad with zeros if needed
+                    while (point.embedding.length < 3) {
+                        point.embedding.push(0);
+                    }
+                }
+                
                 // Use first 3 dimensions of embedding for 3D positioning
                 // Scale positions to fit nicely in the scene
                 const scale = 10;
@@ -269,31 +355,77 @@ class Vector3DVisualizer {
                 );
                 
                 // Convert hex color to RGB
-                const color = new THREE.Color(colorMap[point.cancer_type] || '#999999');
+                const cancerType = point.cancer_type || 'Unknown';
+                const color = new THREE.Color(colorMap[cancerType] || '#999999');
                 colors.push(color.r, color.g, color.b);
             });
             
-            console.log('Positions and colors created, setting geometry attributes...');
+            console.log('Positions and colors created, creating individual meshes for clickability...');
             
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            // Create individual meshes for each point (better for clicking than THREE.Points)
+            this.clickablePoints = []; // Store individual point meshes
+            this.pointsGroup = new THREE.Group(); // Group to hold all point meshes
             
-            console.log('Geometry attributes set, creating material...');
+            const sphereGeometry = new THREE.SphereGeometry(0.08, 8, 8); // Smaller spheres for points (reduced from 0.15)
             
-            // Create point material
-            const material = new THREE.PointsMaterial({
-                size: 0.5,
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.8,
-                sizeAttenuation: true
+            this.data.forEach((point, index) => {
+                // Skip invalid points
+                if (!point || typeof point !== 'object') {
+                    console.warn(`Skipping invalid point at index ${index} for mesh creation:`, point);
+                    return;
+                }
+                
+                // Safety check for embedding
+                if (!point.embedding || !Array.isArray(point.embedding)) {
+                    console.warn(`Skipping point ${index} - invalid embedding:`, point.embedding);
+                    return; // Skip this point
+                }
+                
+                // Ensure we have at least 3 dimensions
+                if (point.embedding.length < 3) {
+                    console.warn(`Point ${index} embedding has less than 3 dimensions, padding with zeros`);
+                    while (point.embedding.length < 3) {
+                        point.embedding.push(0);
+                    }
+                }
+                
+                // Get color for this point
+                const cancerType = point.cancer_type || 'Unknown';
+                const color = new THREE.Color(colorMap[cancerType] || '#999999');
+                
+                // Create material for this point
+                const material = new THREE.MeshBasicMaterial({ 
+                    color: color,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                // Create mesh
+                const pointMesh = new THREE.Mesh(sphereGeometry, material);
+                
+                // Set position
+                const scale = 10;
+                pointMesh.position.set(
+                    (point.embedding[0] || 0) * scale,
+                    (point.embedding[1] || 0) * scale,
+                    (point.embedding[2] || 0) * scale
+                );
+                
+                // Store reference to data for clicking
+                pointMesh.userData = {
+                    index: index,
+                    pointData: point
+                };
+                
+                // Add to group and clickable array
+                this.pointsGroup.add(pointMesh);
+                this.clickablePoints.push(pointMesh);
             });
             
-            console.log('Material created, creating points mesh...');
+            // Add the group to the scene
+            this.scene.add(this.pointsGroup);
             
-            // Create points mesh
-            this.points = new THREE.Points(geometry, material);
-            this.scene.add(this.points);
+            console.log(`Created ${this.clickablePoints.length} clickable point meshes`);
             
             console.log('Points added to scene, creating legend...');
             
@@ -313,30 +445,67 @@ class Vector3DVisualizer {
     }
     
     createLegend(colorMap) {
-        const legendContainer = document.createElement('div');
-        legendContainer.className = 'visualization-3d-legend';
-        legendContainer.innerHTML = `
-            <div class="legend-header">
-                <h6 class="fw-bold mb-2">
-                    <i class="fas fa-palette me-1"></i>Cancer Types
-                </h6>
-            </div>
-            <div class="legend-items">
-                ${Object.entries(colorMap).map(([type, color]) => `
-                    <div class="legend-item" data-cancer-type="${type}">
-                        <span class="legend-color" style="background-color: ${color}"></span>
-                        <span class="legend-label">${type}</span>
-                    </div>
-                `).join('')}
-            </div>
-        `;
+        console.log('Creating legend with color map:', colorMap);
         
-        this.container.appendChild(legendContainer);
+        // Find the legend content div in the template
+        const legendContent = document.getElementById('legend-content');
+        if (!legendContent) {
+            console.error('Legend content div not found');
+            return;
+        }
+        
+        // Clear the loading message and populate with legend items
+        legendContent.innerHTML = Object.entries(colorMap).map(([type, color]) => `
+            <div class="legend-item" data-cancer-type="${type}">
+                <span class="legend-color" style="background-color: ${color}"></span>
+                <span>${type}</span>
+            </div>
+        `).join('');
+        
+        console.log('Legend populated successfully');
     }
     
     setupInteractivity() {
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
+        let hoveredPoint = null;
+        
+        // Add click event listener for closing tooltip when clicking outside
+        document.addEventListener('click', (event) => {
+            const tooltip = document.getElementById('vector-3d-tooltip');
+            if (tooltip && tooltip.style.display !== 'none') {
+                // Don't hide if clicking on the tooltip itself, any of its children, or the canvas
+                if (!tooltip.contains(event.target) && 
+                    !this.renderer.domElement.contains(event.target) &&
+                    !event.target.classList.contains('find-similar-btn')) {
+                    this.hideTooltip();
+                }
+            }
+        });
+        
+        // Add mouse move for hover effects
+        this.renderer.domElement.addEventListener('mousemove', (event) => {
+            const rect = this.renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, this.camera);
+            const intersects = raycaster.intersectObjects(this.clickablePoints);
+            
+            // Reset previous hovered point
+            if (hoveredPoint) {
+                hoveredPoint.material.opacity = 0.8;
+                hoveredPoint = null;
+                this.renderer.domElement.style.cursor = 'default';
+            }
+            
+            // Set new hovered point
+            if (intersects.length > 0) {
+                hoveredPoint = intersects[0].object;
+                hoveredPoint.material.opacity = 1.0;
+                this.renderer.domElement.style.cursor = 'pointer';
+            }
+        });
         
         this.renderer.domElement.addEventListener('click', (event) => {
             const rect = this.renderer.domElement.getBoundingClientRect();
@@ -344,17 +513,26 @@ class Vector3DVisualizer {
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             
             raycaster.setFromCamera(mouse, this.camera);
-            const intersects = raycaster.intersectObject(this.points);
+            
+            // Raycast against individual point meshes
+            const intersects = raycaster.intersectObjects(this.clickablePoints);
             
             if (intersects.length > 0) {
-                const index = intersects[0].index;
-                const pointData = this.data[index];
+                const intersectedMesh = intersects[0].object;
+                const pointData = intersectedMesh.userData.pointData;
+                
+                console.log('🎯 Point clicked:', pointData.id);
                 this.showPointInfo(pointData, event);
+            } else {
+                // Hide tooltip if clicking on empty space
+                this.hideTooltip();
             }
         });
     }
     
     showPointInfo(pointData, event) {
+        console.log('📋 Showing tooltip for point:', pointData.id);
+        
         // Create or update tooltip
         let tooltip = document.getElementById('vector-3d-tooltip');
         if (!tooltip) {
@@ -364,6 +542,9 @@ class Vector3DVisualizer {
             document.body.appendChild(tooltip);
         }
         
+        // Create unique button ID to avoid conflicts
+        const buttonId = `find-similar-btn-${pointData.id.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        
         tooltip.innerHTML = `
             <div class="tooltip-header">
                 <strong>Vector: ${pointData.id}</strong>
@@ -372,19 +553,353 @@ class Vector3DVisualizer {
                 <div><strong>Cancer Type:</strong> ${pointData.cancer_type}</div>
                 <div><strong>Position:</strong> [${pointData.embedding.slice(0, 3).map(v => v.toFixed(3)).join(', ')}]</div>
                 ${pointData.metadata ? `<div><strong>Metadata:</strong> ${JSON.stringify(pointData.metadata, null, 2)}</div>` : ''}
+                <div class="tooltip-actions mt-2">
+                    <button id="${buttonId}" class="btn btn-sm btn-primary find-similar-btn" data-vector-id="${pointData.id}">
+                        Find Similar Vectors
+                    </button>
+                </div>
             </div>
         `;
         
-        tooltip.style.display = 'block';
-        tooltip.style.left = event.pageX + 10 + 'px';
-        tooltip.style.top = event.pageY + 10 + 'px';
+        // Position tooltip more carefully
+        const tooltipWidth = 300; // Approximate tooltip width
+        const tooltipHeight = 150; // Approximate tooltip height
+        const padding = 10;
         
-        // Hide tooltip after 3 seconds
+        // Get viewport dimensions
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        
+        console.log('🔍 Viewport info:', {
+            viewportWidth, 
+            viewportHeight, 
+            scrollTop, 
+            scrollLeft,
+            eventPageX: event.pageX,
+            eventPageY: event.pageY,
+            eventClientX: event.clientX,
+            eventClientY: event.clientY
+        });
+        
+        // Use clientX/Y instead of pageX/Y to get viewport-relative coordinates
+        let left = event.clientX + padding;
+        let top = event.clientY + padding;
+        
+        // Adjust position if tooltip would go off-screen (viewport-relative)
+        if (left + tooltipWidth > viewportWidth) {
+            left = event.clientX - tooltipWidth - padding;
+        }
+        if (top + tooltipHeight > viewportHeight) {
+            top = event.clientY - tooltipHeight - padding;
+        }
+        
+        // Ensure tooltip stays within viewport bounds
+        left = Math.max(padding, Math.min(left, viewportWidth - tooltipWidth - padding));
+        top = Math.max(padding, Math.min(top, viewportHeight - tooltipHeight - padding));
+        
+        // Convert to page coordinates for positioning
+        const finalLeft = left + scrollLeft;
+        const finalTop = top + scrollTop;
+        
+        tooltip.style.display = 'block';
+        tooltip.style.left = finalLeft + 'px';
+        tooltip.style.top = finalTop + 'px';
+        tooltip.style.position = 'absolute';
+        tooltip.style.zIndex = '99999';
+        
+        // Force visibility check - if tooltip is still not visible, position it at a safe location
         setTimeout(() => {
-            tooltip.style.display = 'none';
-        }, 3000);
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const isVisible = tooltipRect.top >= 0 && 
+                             tooltipRect.left >= 0 && 
+                             tooltipRect.bottom <= viewportHeight && 
+                             tooltipRect.right <= viewportWidth;
+            
+            console.log('🔍 Tooltip visibility check:', {
+                isVisible,
+                tooltipRect: {
+                    top: tooltipRect.top,
+                    left: tooltipRect.left,
+                    bottom: tooltipRect.bottom,
+                    right: tooltipRect.right
+                },
+                viewport: {viewportWidth, viewportHeight}
+            });
+            
+            if (!isVisible) {
+                console.log('⚠️ Tooltip not visible, repositioning to safe location');
+                // Position at center-right of viewport as fallback
+                const safeLeft = Math.max(50, viewportWidth - 350);  // 50px from right edge
+                const safeTop = Math.max(50, viewportHeight / 2 - 75); // Center vertically
+                
+                tooltip.style.left = (safeLeft + scrollLeft) + 'px';
+                tooltip.style.top = (safeTop + scrollTop) + 'px';
+                
+                console.log('✅ Tooltip repositioned to safe location:', {
+                    safeLeft: safeLeft + scrollLeft,
+                    safeTop: safeTop + scrollTop
+                });
+            }
+        }, 10);
+        
+        // Store tooltip position for debugging
+        tooltip.dataset.left = finalLeft;
+        tooltip.dataset.top = finalTop;
+        tooltip.dataset.vectorId = pointData.id;
+        
+        // Debug: Check if button was created properly
+        const button = tooltip.querySelector('.find-similar-btn');
+        console.log('🔘 Button created:', button);
+        console.log('🔘 Button classes:', button ? button.className : 'no button found');
+        console.log('🔘 Button data-vector-id:', button ? button.getAttribute('data-vector-id') : 'no button found');
+        console.log('🔘 Tooltip positioned at:', {
+            finalLeft, 
+            finalTop, 
+            width: tooltipWidth, 
+            height: tooltipHeight,
+            viewportRelative: {left, top},
+            willBeVisible: finalTop >= scrollTop && finalTop <= scrollTop + viewportHeight
+        });
+        
+        // Add direct event listener to the button to ensure it works
+        if (button) {
+            // Remove any existing listeners to avoid duplicates
+            button.removeEventListener('click', this.handleButtonClick);
+            
+            // Add direct click handler
+            this.handleButtonClick = (e) => {
+                console.log('🎯 Direct button click handler triggered!');
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                const vectorId = button.getAttribute('data-vector-id');
+                console.log('Direct handler - Vector ID:', vectorId);
+                
+                if (vectorId && this.findSimilarVectors) {
+                    console.log('Calling findSimilarVectors directly...');
+                    this.findSimilarVectors(vectorId);
+                    this.hideTooltip();
+                } else {
+                    console.error('Missing vectorId or findSimilarVectors method');
+                }
+                
+                return false;
+            };
+            
+            button.addEventListener('click', this.handleButtonClick, true);
+            console.log('✅ Direct button event listener added');
+        }
+        
+        // Disable canvas pointer events while tooltip is visible to allow button interaction
+        if (this.renderer && this.renderer.domElement) {
+            this.renderer.domElement.style.pointerEvents = 'none';
+            console.log('🎯 Disabled canvas pointer events for tooltip interaction');
+        }
+        
+        // Clear any existing timeout
+        if (this.tooltipTimeout) {
+            clearTimeout(this.tooltipTimeout);
+        }
+        
+        // Auto-hide tooltip after 15 seconds
+        this.tooltipTimeout = setTimeout(() => {
+            this.hideTooltip();
+        }, 15000);
     }
     
+    hideTooltip() {
+        const tooltip = document.getElementById('vector-3d-tooltip');
+        if (tooltip) {
+            tooltip.style.display = 'none';
+        }
+        if (this.tooltipTimeout) {
+            clearTimeout(this.tooltipTimeout);
+            this.tooltipTimeout = null;
+        }
+        
+        // Re-enable canvas pointer events when tooltip is hidden
+        if (this.renderer && this.renderer.domElement) {
+            this.renderer.domElement.style.pointerEvents = 'auto';
+            console.log('🎯 Re-enabled canvas pointer events after hiding tooltip');
+        }
+    }
+    
+    async findSimilarVectors(vectorId) {
+        console.log('Finding similar vectors for:', vectorId);
+        
+        try {
+            // Show loading state in search results
+            this.updateSearchResults({
+                success: false,
+                loading: true,
+                message: `Finding vectors similar to ${vectorId}...`
+            });
+            
+            // Call the nearest-neighbors API
+            const response = await fetch(`/api/nearest-neighbors/${encodeURIComponent(vectorId)}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                console.log('Found similar vectors:', data.results);
+                this.displaySimilarityResults(data);
+            } else {
+                console.error('Error finding similar vectors:', data.error);
+                this.updateSearchResults({
+                    success: false,
+                    error: data.error
+                });
+            }
+        } catch (error) {
+            console.error('Network error finding similar vectors:', error);
+            this.updateSearchResults({
+                success: false,
+                error: 'Network error: ' + error.message
+            });
+        }
+    }
+    
+    displaySimilarityResults(data) {
+        // Filter out results with distance 0 (exact matches) to find actual similar vectors
+        const similarVectors = data.results.filter(result => result.distance > 0);
+        
+        if (similarVectors.length === 0) {
+            // No similar vectors found (only exact matches)
+            this.updateSearchResults({
+                success: false,
+                error: `No similar vectors found for "${data.query_vector_id}". Only exact matches were found.`
+            });
+        } else {
+            // Update the search results section with similar vectors
+            this.updateSearchResults({
+                success: true,
+                query_vector_id: data.query_vector_id,
+                results: similarVectors
+            });
+        }
+    }
+    
+    updateSearchResults(data) {
+        // Find the new similar vectors section elements
+        const section = document.getElementById('similar-vectors-section');
+        const loading = document.getElementById('similar-vectors-loading');
+        const results = document.getElementById('similar-vectors-results');  
+        const error = document.getElementById('similar-vectors-error');
+        const queryInfo = document.getElementById('similar-vectors-query-info');
+        
+        if (!section || !loading || !results || !error || !queryInfo) {
+            console.warn('Similar vectors section elements not found');
+            return;
+        }
+        
+        // Show the section
+        section.style.display = 'block';
+        
+        // Hide all states initially using CSS classes
+        loading.style.display = 'none';
+        // Don't override Bootstrap's .row display - let CSS handle it
+        results.style.display = '';
+        // Ensure error div is hidden using CSS class
+        error.classList.remove('show-error');
+        error.classList.add('d-none');
+        
+        if (data.loading) {
+            // Show loading state
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            queryInfo.textContent = data.message || 'Finding similar vectors...';
+            results.innerHTML = '';
+            return;
+        }
+        
+        if (!data.success) {
+            // Show error state using CSS class to override Bootstrap
+            error.classList.add('show-error');
+            error.classList.remove('d-none');
+            error.querySelector('.error-message').textContent = data.error || 'Unknown error occurred';
+            results.innerHTML = '';
+            queryInfo.textContent = 'Error occurred during search';
+            return;
+        }
+        
+        // Show success state with results
+        loading.style.display = 'none';
+        // Hide error using CSS class removal
+        error.classList.remove('show-error');
+        error.classList.add('d-none');
+        
+        queryInfo.textContent = `Found ${data.results.length} vectors similar to "${data.query_vector_id}"`;
+        
+        // Clear previous results
+        results.innerHTML = '';
+        
+        // Display each similar vector as a card
+        data.results.forEach((result, index) => {
+            const colDiv = document.createElement('div');
+            // Bootstrap classes for 4 columns per row (col-lg-3 col-md-4 col-sm-6)
+            // lg: 4 cards (12/4 = 3), md: 3 cards, sm: 2 cards
+            colDiv.className = 'col-lg-3 col-md-4 col-sm-6 mb-3';
+            colDiv.classList.add('animate-fade-in');
+            colDiv.style.animationDelay = `${index * 0.1}s`;
+            
+            // Format metadata display
+            let metadataDisplay = 'No metadata';
+            if (result.metadata) {
+                const metadataEntries = Object.entries(result.metadata);
+                if (metadataEntries.length > 0) {
+                    metadataDisplay = metadataEntries.map(([key, value]) => 
+                        `<strong>${key}:</strong> ${value}`
+                    ).join('<br>');
+                }
+            }
+            
+            colDiv.innerHTML = `
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-header bg-transparent border-0 pb-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="mb-0 text-primary fw-semibold">
+                                <i class="fas fa-vector-square me-1"></i>
+                                ${result.id}
+                            </h6>
+                            <small class="badge bg-secondary">
+                                Rank #${index + 1}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="card-body pt-0">
+                        <div class="mb-2">
+                            <strong class="text-muted small">Distance:</strong>
+                            <span class="badge bg-info ms-1">${result.distance.toFixed(4)}</span>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <strong class="text-muted small">Metadata:</strong>
+                            <div class="small mt-1">${metadataDisplay}</div>
+                        </div>
+                        
+                        ${result.document ? `
+                            <div class="mb-0">
+                                <strong class="text-muted small">Document:</strong>
+                                <div class="small mt-1 text-truncate" title="${result.document}">
+                                    ${result.document.length > 100 ? result.document.substring(0, 100) + '...' : result.document}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            
+            results.appendChild(colDiv);
+        });
+        
+        // Scroll to results section smoothly
+        setTimeout(() => {
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+
     animate() {
         requestAnimationFrame(() => this.animate());
         
@@ -403,8 +918,22 @@ class Vector3DVisualizer {
     onWindowResize() {
         if (!this.container) return;
         
-        const width = this.container.clientWidth;
-        const height = this.container.clientHeight;
+        // Force the container to have the correct dimensions
+        const containerStyles = window.getComputedStyle(this.container);
+        let width = this.container.clientWidth || parseInt(containerStyles.width) || 800;
+        let height = this.container.clientHeight || parseInt(containerStyles.height) || 600;
+        
+        // For fullscreen 3D page, ensure we use viewport dimensions
+        const isFullscreen = this.container.classList.contains('vector-3d-container') && 
+                            this.container.parentElement.classList.contains('vector-3d-fullscreen');
+        
+        if (isFullscreen) {
+            // Calculate 95vh for fullscreen mode
+            height = Math.floor(window.innerHeight * 0.95);
+            width = Math.max(width, window.innerWidth - 40); // Account for margins
+        }
+        
+        console.log(`Window resize - updating to dimensions: ${width}x${height}`);
         
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
@@ -462,6 +991,8 @@ class Vector3DVisualizer {
     }
 }
 
+// Initialize the 3D visualization when DOM is loaded
+
 // Initialize 3D visualization when DOM is loaded
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
@@ -507,3 +1038,106 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('✗ 3D container not found in DOM');
     }
 });
+
+// Global event delegation for find-similar-btn clicks
+// This ensures the button is always clickable regardless of when/how the tooltip is created
+document.body.addEventListener('click', function(e) {
+    console.log('🔍 Document body click detected:', e.target.tagName, e.target.className);
+    console.log('🔍 Click coordinates:', {clientX: e.clientX, clientY: e.clientY, pageX: e.pageX, pageY: e.pageY});
+    console.log('🔍 Event target details:', {
+        tagName: e.target.tagName,
+        className: e.target.className,
+        id: e.target.id,
+        classList: Array.from(e.target.classList || []),
+        hasClass: e.target.classList?.contains('find-similar-btn')
+    });
+    
+    // Check current tooltip position for debugging
+    const tooltip = document.getElementById('vector-3d-tooltip');
+    if (tooltip && tooltip.style.display !== 'none') {
+        const tooltipRect = tooltip.getBoundingClientRect();
+        console.log('🔍 Tooltip bounds:', {
+            left: tooltipRect.left,
+            top: tooltipRect.top,
+            right: tooltipRect.right,
+            bottom: tooltipRect.bottom,
+            width: tooltipRect.width,
+            height: tooltipRect.height
+        });
+        console.log('🔍 Click within tooltip bounds:', 
+            e.clientX >= tooltipRect.left && e.clientX <= tooltipRect.right &&
+            e.clientY >= tooltipRect.top && e.clientY <= tooltipRect.bottom
+        );
+    }
+    
+    // Check if the clicked element is the button or if we need to look for it in the event path
+    let targetButton = null;
+    
+    // First check if we clicked directly on the button
+    if (e.target.classList && e.target.classList.contains('find-similar-btn')) {
+        targetButton = e.target;
+        console.log('🎯 Direct button click detected');
+    } else {
+        // Check if the click was on a child element of the button
+        targetButton = e.target.closest('.find-similar-btn');
+        if (targetButton) {
+            console.log('🎯 Button click detected via closest()');
+        } else {
+            // Check all elements under the cursor position to find the button
+            const elementsUnderCursor = document.elementsFromPoint(e.clientX, e.clientY);
+            console.log('🔍 Elements under cursor:', elementsUnderCursor.map(el => el.tagName + '.' + (el.className || '')));
+            
+            for (let element of elementsUnderCursor) {
+                if (element.classList && element.classList.contains('find-similar-btn')) {
+                    targetButton = element;
+                    console.log('🎯 Button found under cursor position');
+                    break;
+                }
+            }
+            
+            // If still not found, check if we're clicking within the tooltip and look for the button there
+            if (!targetButton && tooltip && tooltip.style.display !== 'none') {
+                const tooltipRect = tooltip.getBoundingClientRect();
+                const isWithinTooltip = e.clientX >= tooltipRect.left && e.clientX <= tooltipRect.right &&
+                                      e.clientY >= tooltipRect.top && e.clientY <= tooltipRect.bottom;
+                
+                if (isWithinTooltip) {
+                    const buttonInTooltip = tooltip.querySelector('.find-similar-btn');
+                    if (buttonInTooltip) {
+                        targetButton = buttonInTooltip;
+                        console.log('🎯 Button found within tooltip bounds');
+                    }
+                }
+            }
+        }
+    }
+    
+    if (targetButton) {
+        console.log('🎯 Find similar button clicked via global delegation');
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        const vectorId = targetButton.getAttribute('data-vector-id');
+        console.log('Vector ID:', vectorId);
+        
+        // Get the visualizer instance and call findSimilarVectors
+        if (window.vector3DVisualizer && typeof window.vector3DVisualizer.findSimilarVectors === 'function') {
+            console.log('Calling findSimilarVectors...');
+            window.vector3DVisualizer.findSimilarVectors(vectorId);
+            
+            // Hide the tooltip
+            const tooltip = document.getElementById('vector-3d-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'none';
+            }
+        } else {
+            console.error('Vector3DVisualizer instance not found or findSimilarVectors method not available');
+            console.log('window.vector3DVisualizer:', window.vector3DVisualizer);
+        }
+        
+        return false;
+    }
+}, true); // Use capture phase to ensure it fires before other handlers
+
+console.log('✅ Global event delegation for find-similar-btn has been set up');

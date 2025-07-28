@@ -18,7 +18,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function showError(message) {
         if (searchError && errorMessage) {
             searchError.style.display = 'block';
-            searchSuccess.style.display = 'none';
+            if (searchSuccess) {
+                searchSuccess.style.display = 'none';
+            }
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
             errorMessage.textContent = message;
         }
     }
@@ -26,15 +31,25 @@ document.addEventListener('DOMContentLoaded', function() {
     function showSuccess(message) {
         if (searchSuccess && successMessage) {
             searchSuccess.style.display = 'block';
-            searchError.style.display = 'none';
+            if (searchError) {
+                searchError.style.display = 'none';
+            }
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
             successMessage.textContent = message;
         }
     }
 
     function hideMessages() {
-        if (searchError && searchSuccess) {
+        if (searchError) {
             searchError.style.display = 'none';
+        }
+        if (searchSuccess) {
             searchSuccess.style.display = 'none';
+        }
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'none';
         }
     }
 
