@@ -173,7 +173,7 @@ class Vector3DVisualizer {
         
         this.container.appendChild(this.renderer.domElement);
         
-        // Create UI panels after renderer is set up
+        // Create UI panels after renderer is set up (but don't position them yet)
         this.createUIElements();
     }
     
@@ -215,10 +215,7 @@ class Vector3DVisualizer {
         // Append to body for fixed positioning
         document.body.appendChild(controlsPanel);
         
-        // Position it relative to the canvas with a small delay
-        setTimeout(() => {
-            this.positionPanel(controlsPanel, 'bottom-left');
-        }, 100);
+        // Don't position immediately - wait for canvas to be fully rendered
     }
     
     createLegendPanel(colorMap) {
@@ -248,10 +245,7 @@ class Vector3DVisualizer {
         // Append to body for fixed positioning
         document.body.appendChild(legendPanel);
         
-        // Position it relative to the canvas with a small delay
-        setTimeout(() => {
-            this.positionPanel(legendPanel, 'bottom-right');
-        }, 100);
+        // Don't position immediately - wait for canvas to be fully rendered
     }
     
     positionPanel(panel, position) {
@@ -281,6 +275,22 @@ class Vector3DVisualizer {
         panel.style.zIndex = '1000';
         
         console.log(`Panel ${position} positioned at:`, { left, top, canvasRect });
+    }
+    
+    positionPanelsAfterLoad() {
+        // Wait for the canvas to be fully rendered and have correct dimensions
+        setTimeout(() => {
+            console.log('Positioning panels after visualization load...');
+            
+            // Force a render frame to ensure canvas has correct dimensions
+            this.renderer.render(this.scene, this.camera);
+            
+            // Position panels with another small delay to ensure DOM is updated
+            setTimeout(() => {
+                this.repositionPanels();
+                console.log('Panels positioned after load');
+            }, 50);
+        }, 200); // Longer delay to ensure everything is rendered
     }
     
     repositionPanels() {
@@ -630,6 +640,9 @@ class Vector3DVisualizer {
             this.setupInteractivity();
             
             console.log('Visualization creation complete!');
+            
+            // Position UI panels after everything is loaded and rendered
+            this.positionPanelsAfterLoad();
         } catch (error) {
             console.error('Error in createVisualization:', error);
             this.showError('Error creating 3D visualization: ' + error.message);
@@ -1182,6 +1195,12 @@ class Vector3DVisualizer {
             }, 100);
             
             console.log('Placeholder hidden with multiple methods');
+            
+            // Reposition panels after loading state is hidden and canvas is visible
+            setTimeout(() => {
+                this.repositionPanels();
+                console.log('Panels repositioned after loading state hidden');
+            }, 150);
         } else {
             console.log('No placeholder found to hide');
         }
