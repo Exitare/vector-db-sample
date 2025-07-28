@@ -173,32 +173,70 @@ class Vector3DVisualizer {
     
     setupControls() {
         console.log('Setting up controls...');
+        console.log('THREE.OrbitControls available:', typeof THREE.OrbitControls);
+        console.log('THREE.OrbitControls:', THREE.OrbitControls);
         
         // Check if OrbitControls is available
         if (typeof THREE.OrbitControls !== 'undefined') {
             console.log('✅ OrbitControls found, setting up advanced camera controls');
-            this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
             
-            // Configure OrbitControls settings
-            this.controls.enableDamping = true;
-            this.controls.dampingFactor = 0.05;
-            this.controls.screenSpacePanning = false;
-            this.controls.minDistance = 3;
-            this.controls.maxDistance = 100;
-            this.controls.maxPolarAngle = Math.PI; // Allow full vertical rotation
-            this.controls.minPolarAngle = 0; // Allow full vertical rotation
+            try {
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                console.log('OrbitControls instance created successfully');
+                
+                // Configure OrbitControls settings for full rotation freedom
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+                this.controls.screenSpacePanning = false;
+                this.controls.minDistance = 3;
+                this.controls.maxDistance = 100;
+                
+                // Allow full rotation in all directions
+                this.controls.maxPolarAngle = Math.PI; // Allow full vertical rotation (0 to 180 degrees)
+                this.controls.minPolarAngle = 0; // Allow looking straight down
+                this.controls.maxAzimuthAngle = Infinity; // Allow unlimited horizontal rotation
+                this.controls.minAzimuthAngle = -Infinity; // Allow unlimited horizontal rotation
+                
+                // Enable all types of controls
+                this.controls.enableRotate = true;
+                this.controls.enableZoom = true;
+                this.controls.enablePan = true;
+                
+                // Set rotation and interaction speeds
+                this.controls.rotateSpeed = 1.0;
+                this.controls.zoomSpeed = 1.2;
+                this.controls.panSpeed = 0.8;
+                
+                // Ensure mouse buttons are properly configured
+                this.controls.mouseButtons = {
+                    LEFT: THREE.MOUSE.ROTATE,    // Left mouse button for rotation
+                    MIDDLE: THREE.MOUSE.DOLLY,   // Middle mouse button for zoom
+                    RIGHT: THREE.MOUSE.PAN       // Right mouse button for panning
+                };
+                
+                // Enable touch controls for mobile
+                this.controls.touches = {
+                    ONE: THREE.TOUCH.ROTATE,     // One finger for rotation
+                    TWO: THREE.TOUCH.DOLLY_PAN   // Two fingers for zoom and pan
+                };
+                
+                console.log('OrbitControls configured successfully with full rotation freedom');
+                console.log('Controls settings:', {
+                    enableRotate: this.controls.enableRotate,
+                    enableZoom: this.controls.enableZoom,
+                    enablePan: this.controls.enablePan,
+                    maxAzimuthAngle: this.controls.maxAzimuthAngle,
+                    minAzimuthAngle: this.controls.minAzimuthAngle,
+                    rotateSpeed: this.controls.rotateSpeed
+                });
+                
+            } catch (error) {
+                console.error('Failed to create OrbitControls:', error);
+                console.warn('⚠️ Falling back to basic mouse controls due to OrbitControls error');
+                this.controls = null;
+                this.addBasicMouseControls();
+            }
             
-            // Enable all types of controls
-            this.controls.enableRotate = true;
-            this.controls.enableZoom = true;
-            this.controls.enablePan = true;
-            
-            // Set rotation speed
-            this.controls.rotateSpeed = 1.0;
-            this.controls.zoomSpeed = 1.2;
-            this.controls.panSpeed = 0.8;
-            
-            console.log('OrbitControls configured successfully');
         } else {
             console.warn('⚠️ OrbitControls not found, falling back to basic mouse controls');
             this.controls = null;
@@ -207,18 +245,24 @@ class Vector3DVisualizer {
     }
     
     addBasicMouseControls() {
-        // Simple camera rotation without OrbitControls
+        // Enhanced camera rotation without OrbitControls
         let mouseDown = false;
         let mouseX = 0;
         let mouseY = 0;
+        let phi = 0; // Horizontal rotation
+        let theta = Math.PI / 4; // Vertical rotation
+        let radius = 20; // Distance from center - make it mutable
         
         this.renderer.domElement.addEventListener('mousedown', (event) => {
-            mouseDown = true;
-            mouseX = event.clientX;
-            mouseY = event.clientY;
+            if (event.button === 0) { // Left mouse button only
+                mouseDown = true;
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+                event.preventDefault();
+            }
         });
         
-        this.renderer.domElement.addEventListener('mouseup', () => {
+        document.addEventListener('mouseup', () => {
             mouseDown = false;
         });
         
@@ -228,16 +272,39 @@ class Vector3DVisualizer {
             const deltaX = event.clientX - mouseX;
             const deltaY = event.clientY - mouseY;
             
-            // Simple camera rotation
-            this.camera.position.x = Math.cos(deltaX * 0.01) * 20;
-            this.camera.position.z = Math.sin(deltaX * 0.01) * 20;
-            this.camera.position.y += deltaY * 0.1;
+            // Update rotation angles
+            phi -= deltaX * 0.01; // Horizontal rotation (left/right)
+            theta = Math.max(0.1, Math.min(Math.PI - 0.1, theta + deltaY * 0.01)); // Vertical rotation (up/down)
+            
+            // Calculate new camera position using spherical coordinates
+            this.camera.position.x = radius * Math.sin(theta) * Math.cos(phi);
+            this.camera.position.y = radius * Math.cos(theta);
+            this.camera.position.z = radius * Math.sin(theta) * Math.sin(phi);
             
             this.camera.lookAt(0, 0, 0);
             
             mouseX = event.clientX;
             mouseY = event.clientY;
+            event.preventDefault();
         });
+        
+        // Add zoom with mouse wheel
+        this.renderer.domElement.addEventListener('wheel', (event) => {
+            const zoomSpeed = 0.1;
+            const direction = event.deltaY > 0 ? 1 : -1;
+            radius = Math.max(5, Math.min(50, radius + direction * zoomSpeed * radius));
+            
+            // Update camera position with new radius
+            this.camera.position.x = radius * Math.sin(theta) * Math.cos(phi);
+            this.camera.position.y = radius * Math.cos(theta);
+            this.camera.position.z = radius * Math.sin(theta) * Math.sin(phi);
+            
+            this.camera.lookAt(0, 0, 0);
+            
+            event.preventDefault();
+        });
+        
+        console.log('Basic mouse controls with full rotation enabled');
     }
     
     setupLights() {
