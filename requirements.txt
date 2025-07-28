@@ -1,6 +1,8 @@
 pandas
 chromadb
 quart
+hypercorn
+prometheus-client
 h5py
 matplotlib
 umap-learn

@@ -1,4 +1,4 @@
-from quart import Quart, render_template, request, redirect, url_for, flash, jsonify
+from quart import Quart, render_template, request, redirect, url_for, flash, jsonify, Response
 import chromadb
 import pandas as pd
 import numpy as np
@@ -17,6 +17,55 @@ import umap
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+import time
+
+# Prometheus metrics
+from prometheus_client import Counter as PrometheusCounter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+
+# Define metrics with proper parameters
+REQUEST_COUNT = PrometheusCounter(
+    'http_requests_total', 
+    'Total HTTP requests', 
+    ['method', 'endpoint', 'status']
+)
+REQUEST_DURATION = Histogram(
+    'http_request_duration_seconds', 
+    'HTTP request duration in seconds', 
+    ['method', 'endpoint']
+)
+VECTOR_COUNT = Gauge(
+    'vector_database_vectors_total', 
+    'Total number of vectors in database'
+)
+SEARCH_DURATION = Histogram(
+    'vector_search_duration_seconds', 
+    'Vector search duration in seconds'
+)
+UMAP_GENERATION_DURATION = Histogram(
+    'umap_generation_duration_seconds', 
+    'UMAP generation duration in seconds'
+)
+UPLOAD_COUNT = PrometheusCounter(
+    'vector_uploads_total', 
+    'Total number of vector uploads', 
+    ['file_type']
+)
+COLLECTION_COUNT = Gauge(
+    'vector_database_collections_total', 
+    'Total number of collections'
+)
+API_ERRORS = PrometheusCounter(
+    'api_errors_total', 
+    'Total API errors', 
+    ['endpoint', 'error_type']
+)
+
+# Page view tracking metric
+PAGE_VIEWS = PrometheusCounter(
+    'page_views_total',
+    'Total number of page views',
+    ['page', 'user_agent']
+)
 
 app = Quart(__name__)
 app.secret_key = "your-secret-key"
@@ -32,9 +81,56 @@ umap_cache = {}
 chroma_client = chromadb.PersistentClient(path=".chromadb")
 collection = chroma_client.get_or_create_collection("heterogeneous_vectors")
 
+# Middleware to track metrics
+@app.before_request
+async def before_request():
+    request.start_time = time.time()
+
+@app.after_request
+async def after_request(response):
+    if hasattr(request, 'start_time'):
+        duration = time.time() - request.start_time
+        endpoint = request.endpoint or 'unknown'
+        method = request.method
+        status = str(response.status_code)
+        
+        # Update metrics
+        REQUEST_COUNT.labels(method=method, endpoint=endpoint, status=status).inc()
+        REQUEST_DURATION.labels(method=method, endpoint=endpoint).observe(duration)
+    
+    return response
+
+# Update collection metrics
+def update_collection_metrics():
+    try:
+        # Update vector count
+        results = collection.get()
+        VECTOR_COUNT.set(len(results['ids']) if results['ids'] else 0)
+        
+        # Update collection count
+        collections = chroma_client.list_collections()
+        COLLECTION_COUNT.set(len(collections))
+    except Exception as e:
+        print(f"Error updating metrics: {e}")
+
+# Metrics endpoint
+@app.route('/metrics')
+async def metrics():
+    """Prometheus metrics endpoint"""
+    try:
+        update_collection_metrics()
+        return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+    except Exception as e:
+        API_ERRORS.labels(endpoint='metrics', error_type=type(e).__name__).inc()
+        return Response(f"Error generating metrics: {str(e)}", status=500)
+
 
 @app.route('/', methods=['GET'])
 async def index():
+    # Track page view
+    user_agent = request.headers.get('User-Agent', 'Unknown')[:50]  # Truncate to avoid high cardinality
+    PAGE_VIEWS.labels(page='index', user_agent=user_agent).inc()
+    
     collections = chroma_client.list_collections()
     
     # Create enhanced collection info with metadata
@@ -53,6 +149,29 @@ async def index():
                                  collections_info=collections_info,
                                  current_collection=collection.name,
                                  current_collection_metadata=current_collection_metadata)
+
+
+@app.route('/health', methods=['GET'])
+async def health_check():
+    """Health check endpoint for Docker and monitoring systems"""
+    try:
+        # Check if ChromaDB is accessible
+        collections = chroma_client.list_collections()
+        
+        return jsonify({
+            'status': 'healthy',
+            'service': 'vector-db-app',
+            'timestamp': datetime.now().isoformat(),
+            'collections_count': len(collections),
+            'current_collection': collection.name if collection else None
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'service': 'vector-db-app',
+            'timestamp': datetime.now().isoformat(),
+            'error': str(e)
+        }), 503
 
 
 @app.route('/set-collection', methods=['POST'])
@@ -121,11 +240,13 @@ async def search_vector():
 @app.route('/api/search-vector', methods=['POST'])
 async def api_search_vector():
     """API endpoint for AJAX vector search"""
+    start_time = time.time()
     try:
         data = await request.get_json()
         query_vector_str = data.get('query_vector', '')
         
         if not query_vector_str:
+            API_ERRORS.labels(endpoint='search-vector', error_type='ValidationError').inc()
             return jsonify({
                 'success': False, 
                 'error': 'Query vector is required'
@@ -134,22 +255,28 @@ async def api_search_vector():
         try:
             query_vector = list(map(float, query_vector_str.split(',')))
         except ValueError:
+            API_ERRORS.labels(endpoint='search-vector', error_type='ValidationError').inc()
             return jsonify({
                 'success': False,
                 'error': 'Invalid vector format. Please enter comma-separated numbers (e.g., 0.1, 0.2, 0.3)'
             }), 400
 
         if len(query_vector) == 0:
+            API_ERRORS.labels(endpoint='search-vector', error_type='ValidationError').inc()
             return jsonify({
                 'success': False,
                 'error': 'Query vector cannot be empty'
             }), 400
 
+        # Perform search with timing
+        search_start = time.time()
         results = collection.query(
             query_embeddings=[query_vector],
             n_results=10,
             include=['documents', 'metadatas', 'distances']
         )
+        search_duration = time.time() - search_start
+        SEARCH_DURATION.observe(search_duration)
 
         hits = [
             {
@@ -167,6 +294,7 @@ async def api_search_vector():
         })
 
     except Exception as e:
+        API_ERRORS.labels(endpoint='search-vector', error_type=type(e).__name__).inc()
         return jsonify({
             'success': False,
             'error': f'Search failed: {str(e)}'
@@ -176,6 +304,8 @@ async def api_search_vector():
 @app.route('/api/vectors-3d', methods=['GET'])
 async def api_vectors_3d():
     """API endpoint for 3D visualization data (optimized for performance)"""
+    start_time = time.time()
+    
     try:
         # Get vectors with pagination limit for performance
         limit = min(int(request.args.get('limit', 1000)), 5000)  # Max 5000 points
@@ -218,6 +348,10 @@ async def api_vectors_3d():
                 'document': results['documents'][i] if results['documents'] and i < len(results['documents']) else None
             })
         
+        # Record successful 3D data retrieval
+        duration = time.time() - start_time
+        SEARCH_DURATION.observe(duration)  # Reuse search duration metric
+        
         return jsonify({
             'success': True,
             'vectors': vectors_3d,
@@ -226,6 +360,11 @@ async def api_vectors_3d():
         })
         
     except Exception as e:
+        # Record 3D visualization error
+        duration = time.time() - start_time
+        SEARCH_DURATION.observe(duration)
+        API_ERRORS.labels(endpoint='vectors-3d', error_type=type(e).__name__).inc()
+        
         return jsonify({
             'success': False,
             'error': f'Failed to load 3D data: {str(e)}'
@@ -246,16 +385,20 @@ async def upload_data():
         return redirect(url_for('browse_vectors'))
 
     filename = file.filename.lower()
+    file_type = 'unknown'
 
     try:
         content = file.read()  # This is sync, valid in Quart
         if filename.endswith('.csv'):
+            file_type = 'csv'
             df = pd.read_csv(io.StringIO(content.decode('utf-8')))
             ids = df['submitter_ids'].astype(str).tolist()
             embeddings = df['X'].apply(lambda v: list(map(float, v.split(',')))).tolist()
+            y_values = df['y']
             metadatas = [{'y': y.decode('utf-8') if isinstance(y, bytes) else y} for y in y_values.tolist()]
 
         elif filename.endswith('.h5') or filename.endswith('.hdf5'):
+            file_type = 'hdf5'
             # Save and load with h5py
             filepath = f"/tmp/{file.filename}"
             with open(filepath, 'wb') as f:
@@ -285,10 +428,14 @@ async def upload_data():
                 metadatas=metadatas[i:i + batch_size]
             )
 
+        # Update upload metrics
+        UPLOAD_COUNT.labels(file_type=file_type).inc()
+        
         await flash(f"Uploaded and stored {len(ids)} vectors.", "success")
 
     except Exception as e:
         print("Upload error:", e)
+        API_ERRORS.labels(endpoint='upload-data', error_type=type(e).__name__).inc()
         await flash(f"Error processing file: {str(e)}", "danger")
 
     return redirect(url_for('browse_vectors'))
@@ -296,6 +443,10 @@ async def upload_data():
 
 @app.route('/browse-vectors')
 async def browse_vectors():
+    # Track page view
+    user_agent = request.headers.get('User-Agent', 'Unknown')[:50]  # Truncate to avoid high cardinality
+    PAGE_VIEWS.labels(page='browse-vectors', user_agent=user_agent).inc()
+    
     try:
         results = collection.get(include=["embeddings", "metadatas", "documents"])
 
@@ -329,72 +480,73 @@ async def browse_vectors():
 
 
 def generate_umap_sync(embeddings, metadatas):
-    """Synchronous UMAP generation function to run in thread pool"""
+    """Generate UMAP embeddings synchronously with metrics tracking"""
+    start_time = time.time()
+    
     try:
-        # Set matplotlib to use non-interactive backend for thread safety
-        import matplotlib
-        matplotlib.use('Agg')  # Use non-GUI backend
-        import matplotlib.pyplot as plt
-        import matplotlib.colors as mcolors
-        import numpy as np
+        # Default parameters
+        n_neighbors = min(15, len(embeddings) - 1) if len(embeddings) > 1 else 1
+        min_dist = 0.1
         
-        # Validate input safely (avoid boolean evaluation on arrays)
-        if embeddings is None or len(embeddings) == 0:
-            return {"success": False, "error": "No embeddings provided"}
+        # Convert to numpy array if needed
+        if not isinstance(embeddings, np.ndarray):
+            embeddings = np.array(embeddings)
         
         if len(embeddings) < 2:
-            return {"success": False, "error": "Need at least 2 vectors for UMAP projection"}
-
-        # Extract cancer types (using your exact working logic)
-        cancer_types = []
-        for meta in metadatas:
-            y = meta.get("y", "Unknown") if meta else "Unknown"
-            if isinstance(y, bytes):
-                y = y.decode()
-            cancer_types.append(str(y))
-
-        unique_labels = sorted(set(cancer_types))
-        color_list = list(mcolors.TABLEAU_COLORS.values()) + list(mcolors.CSS4_COLORS.values())
-        label_colors = {label: color_list[i % len(color_list)] for i, label in enumerate(unique_labels)}
-        point_colors = [label_colors[label] for label in cancer_types]
-
-        # UMAP projection (using your exact working parameters)
-        reducer = umap.UMAP(n_components=2, random_state=42)
-        reduced = reducer.fit_transform(embeddings)
-
-        # Plot (using your exact working approach but with larger size)
-        fig, ax = plt.subplots(figsize=(10, 8))
-        scatter = ax.scatter(reduced[:, 0], reduced[:, 1], c=point_colors, alpha=0.7)
-        ax.set_title("UMAP Projection of Embeddings", fontsize=14, fontweight='bold')
-        ax.set_xlabel("UMAP 1")
-        ax.set_ylabel("UMAP 2")
-
-        # Legend (using your exact working legend code)
-        handles = [
-            plt.Line2D([0], [0], marker='o', color='w',
-                       label=label, markersize=7,
-                       markerfacecolor=label_colors[label])
-            for label in unique_labels
-        ]
-        ax.legend(handles=handles, title="Cancer Types", bbox_to_anchor=(1.05, 1), loc='upper left')
-
-        # Save plot to base64 (with higher DPI for better quality)
-        buf = io.BytesIO()
-        plt.tight_layout()
-        fig.savefig(buf, format="png", dpi=200, bbox_inches='tight', facecolor='white')
-        buf.seek(0)
-        img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+            return {"success": False, "error": "Need at least 2 vectors for UMAP"}
         
-        # Clean up
-        plt.close(fig)
-
-        return {"success": True, "image": img_base64}
-
+        # Generate UMAP with 2D output
+        reducer = umap.UMAP(
+            n_neighbors=n_neighbors,
+            min_dist=min_dist,
+            n_components=2,
+            random_state=42,
+            verbose=False
+        )
+        
+        umap_result = reducer.fit_transform(embeddings)
+        
+        # Format response
+        points = []
+        for i, (coord, metadata) in enumerate(zip(umap_result, metadatas)):
+            points.append({
+                "x": float(coord[0]),
+                "y": float(coord[1]),
+                "metadata": metadata
+            })
+        
+        # Record successful UMAP generation
+        duration = time.time() - start_time
+        UMAP_GENERATION_DURATION.observe(duration)
+        
+        return {"success": True, "points": points}
+        
     except Exception as e:
-        # Make sure to clean up matplotlib resources even on error
+        # Record UMAP generation error
+        duration = time.time() - start_time
+        UMAP_GENERATION_DURATION.observe(duration)
+        API_ERRORS.labels(endpoint='generate-umap', error_type=type(e).__name__).inc()
+        
+        print(f"UMAP Error: {e}")
+        import traceback
+        traceback.print_exc()
         try:
-            plt.close('all')
-            plt.clf()
+            # Fallback with simpler parameters
+            reducer = umap.UMAP(n_neighbors=2, min_dist=0.5, n_components=2, random_state=42)
+            umap_result = reducer.fit_transform(embeddings)
+            points = []
+            for i, (coord, metadata) in enumerate(zip(umap_result, metadatas)):
+                points.append({
+                    "x": float(coord[0]),
+                    "y": float(coord[1]),
+                    "metadata": metadata
+                })
+            
+            # Record successful fallback UMAP generation
+            duration = time.time() - start_time
+            UMAP_GENERATION_DURATION.observe(duration)
+            
+            return {"success": True, "points": points}
         except:
             pass
         return {"success": False, "error": f"UMAP generation failed: {str(e)}"}
@@ -561,6 +713,10 @@ def get_all_collections():
 
 @app.route('/create-collection', methods=['GET'])
 async def create_collection_page():
+    # Track page view
+    user_agent = request.headers.get('User-Agent', 'Unknown')[:50]  # Truncate to avoid high cardinality
+    PAGE_VIEWS.labels(page='create-collection', user_agent=user_agent).inc()
+    
     return await render_template(
         'create.html',
         current_collection=collection,  # Safe fallback
@@ -569,7 +725,39 @@ async def create_collection_page():
 
 
 if __name__ == "__main__":
+    import os
+    
     try:
-        app.run(debug=True)
+        # Check if we're in production mode
+        flask_env = os.getenv('FLASK_ENV', 'development')
+        flask_debug = os.getenv('FLASK_DEBUG', '1') == '1'
+        
+        if flask_env == 'production' and not flask_debug:
+            # Production mode - use Hypercorn
+            from hypercorn.config import Config
+            from hypercorn.asyncio import serve
+            import asyncio
+            
+            config = Config()
+            config.bind = ["0.0.0.0:5000"]  # Bind to all interfaces
+            config.workers = 1  # Adjust based on your needs
+            config.access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+            config.accesslog = "-"  # Log to stdout
+            config.errorlog = "-"   # Log to stdout
+            
+            print(f"🚀 Starting Vector DB Application in PRODUCTION mode on {config.bind[0]}")
+            print("📊 Monitoring endpoints:")
+            print("   - Application: http://localhost:5000")
+            print("   - Health check: http://localhost:5000/")
+            
+            # Run with Hypercorn
+            asyncio.run(serve(app, config))
+        else:
+            # Development mode - use Quart's development server
+            print(f"🔧 Starting Vector DB Application in DEVELOPMENT mode")
+            print("   - Application: http://localhost:5000")
+            print("   - Debug mode: enabled")
+            app.run(debug=True, host='0.0.0.0', port=5000)
+            
     finally:
         executor.shutdown(wait=True)
