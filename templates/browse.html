@@ -1,53 +1,406 @@
 {% extends "base.html" %}
 
-{% block title %}All Vectors{% endblock %}
+{% block title %}Explore Data - Vector Research Platform{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% endblock %}
 
 {% block content %}
-<h1 class="mb-4">All Stored Vectors</h1>
-<a href="/" class="btn btn-secondary mb-4">Back</a>
-
-<!-- Bar Chart -->
-<canvas id="cancerChart"
-        width="400"
-        height="150"
-        class="mb-5"
-        data-labels='{{ cancer_counts.keys() | list | tojson }}'
-        data-values='{{ cancer_counts.values() | list | tojson }}'>
-</canvas>
-
-<!-- UMAP placeholder -->
-<div class="mb-5" id="umap-container">
-    <h4>UMAP Projection of Embeddings</h4>
-    <div id="umap-placeholder" class="d-flex justify-content-center align-items-center"
-         style="height: 300px; background-color: #f8f9fa; border: 1px solid #dee2e6;">
-        <span class="text-muted">Generating UMAP plot...</span>
+<!-- Hero Section -->
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="research-badge">
+                    <i class="fas fa-chart-scatter me-1"></i>
+                    Data Explorer
+                </div>
+                <h1 class="display-4 fw-bold mb-3">Vector Data Visualization</h1>
+                <p class="lead opacity-90">
+                    Explore your vector embeddings through interactive visualizations and data analysis.
+                    Discover patterns and relationships in your high-dimensional research data.
+                </p>
+                <div class="mt-4">
+                    <a href="/" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="stats-card">
+                    <h3 class="fw-bold mb-1">{{ vectors|length }}</h3>
+                    <p class="mb-0 opacity-90">Total Vectors</p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="row py-5">
-    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-        <table class="table table-bordered table-hover table-sm align-middle">
-            <thead class="table-light sticky-top">
-            <tr>
-                <th>ID</th>
-                <th>Document</th>
-                <th>Metadata</th>
-                <th>Embedding (truncated)</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for vector in vectors %}
-            <tr>
-                <td>{{ vector.id }}</td>
-                <td>{{ vector.document or "—" }}</td>
-                <td>
-                    <pre class="mb-0">{{ vector.metadata | tojson(indent=0) }}</pre>
-                </td>
-                <td><code>{{ vector.embedding[:10] }}...</code></td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+<div class="container">
+    <!-- Data Import Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card animate-fade-in border-0 shadow-sm">
+                <div class="card-header bg-primary text-white border-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-upload me-2"></i>
+                        Import Research Data
+                    </h4>
+                    <p class="mb-0 opacity-90">Upload your vector embeddings from CSV or HDF5 files</p>
+                </div>
+                <div class="card-body">
+                    <form action="/upload-data" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        <div class="row align-items-end">
+                            <div class="col-lg-8 mb-3">
+                                <label for="data_file" class="form-label fw-semibold">
+                                    <i class="fas fa-file-csv text-primary me-1"></i>
+                                    Select Data File
+                                </label>
+                                <input type="file" 
+                                       class="form-control form-control-lg" 
+                                       id="data_file" 
+                                       name="data_file" 
+                                       accept=".csv,.h5,.hdf5"
+                                       required>
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle text-muted me-1"></i>
+                                    Supported formats: CSV, HDF5 (.h5, .hdf5)
+                                </div>
+                                <div class="invalid-feedback">
+                                    Please select a valid data file.
+                                </div>
+                            </div>
+                            <div class="col-lg-4 mb-3">
+                                <button type="submit" class="btn btn-primary btn-lg w-100">
+                                    <i class="fas fa-cloud-upload-alt me-2"></i>
+                                    Upload Data
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- File Format Info -->
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <div class="glass-effect p-3 rounded">
+                                    <h6 class="fw-bold text-primary mb-2">
+                                        <i class="fas fa-file-csv me-1"></i>CSV Format
+                                    </h6>
+                                    <ul class="small mb-0 text-muted">
+                                        <li><code>submitter_ids</code>: Unique identifiers</li>
+                                        <li><code>X</code>: Comma-separated embedding values</li>
+                                        <li><code>y</code>: Category/label information</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="glass-effect p-3 rounded">
+                                    <h6 class="fw-bold text-success mb-2">
+                                        <i class="fas fa-database me-1"></i>HDF5 Format
+                                    </h6>
+                                    <ul class="small mb-0 text-muted">
+                                        <li><code>/submitter_ids</code>: ID dataset</li>
+                                        <li><code>/X</code>: Embedding matrix</li>
+                                        <li><code>/y</code>: Label dataset</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vector Similarity Search Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-info text-white border-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-search me-2"></i>
+                        Vector Similarity Search
+                    </h4>
+                    <p class="mb-0 opacity-90">Find similar vectors using cosine similarity or other metrics</p>
+                </div>
+                <div class="card-body">
+                    <!-- Search Form -->
+                    <form id="searchForm" class="row align-items-end">
+                        <div class="col-md-8">
+                            <label for="query_vector" class="form-label fw-semibold">Query Vector</label>
+                            <input type="text" class="form-control" id="query_vector" name="query_vector"
+                                   placeholder="Enter comma-separated values (e.g., 0.1, 0.2, 0.3, 0.4)" required>
+                            <div class="form-text">
+                                <i class="fas fa-lightbulb me-1"></i>
+                                Enter your query vector as comma-separated float values
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-success w-100" id="searchButton">
+                                <i class="fas fa-search me-1"></i>Search Similar
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <!-- Loading Indicator -->
+                    <div id="loadingIndicator" class="text-center mt-3" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Searching...</span>
+                        </div>
+                        <div class="mt-2 text-muted">Searching for similar vectors...</div>
+                    </div>
+                    
+                    <!-- Error Alert -->
+                    <div id="searchError" class="alert alert-danger mt-3" style="display: none;" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="errorMessage"></span>
+                    </div>
+                    
+                    <!-- Success Message -->
+                    <div id="searchSuccess" class="alert alert-success mt-3" style="display: none;" role="alert">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <span id="successMessage"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Results Container -->
+    <div id="searchResultsContainer" class="hidden">
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card animate-fade-in">
+                    <div class="card-header bg-transparent border-0 pb-0">
+                        <h4 class="card-title mb-1">
+                            <i class="fas fa-chart-line text-warning me-2"></i>
+                            Search Results
+                        </h4>
+                        <p class="text-muted mb-0">Most similar vectors ranked by distance</p>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="resultsTable">
+                                <thead>
+                                <tr>
+                                    <th class="px-4 py-3">
+                                        <i class="fas fa-hashtag me-1"></i>ID
+                                    </th>
+                                    <th class="py-3">
+                                        <i class="fas fa-file-text me-1"></i>Document
+                                    </th>
+                                    <th class="py-3">
+                                        <i class="fas fa-tags me-1"></i>Metadata
+                                    </th>
+                                    <th class="py-3">
+                                        <i class="fas fa-ruler me-1"></i>Distance
+                                    </th>
+                                </tr>
+                                </thead>
+                                <tbody id="resultsTableBody">
+                                <!-- Results will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Dashboard - Distribution and UMAP Row -->
+    <div class="row mb-5">
+        <div class="col-lg-6 mb-4">
+            <div class="card animate-fade-in h-100">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-chart-bar text-primary me-2"></i>
+                        Distribution Analysis
+                    </h4>
+                    <p class="text-muted mb-0">Category distribution in your dataset</p>
+                </div>
+                <div class="card-body">
+                    <canvas id="cancerChart"
+                            width="400"
+                            height="200"
+                            data-labels='{{ cancer_counts.keys() | list | tojson }}'
+                            data-values='{{ cancer_counts.values() | list | tojson }}'>
+                    </canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-4">
+            <div class="card animate-fade-in h-100">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-project-diagram text-success me-2"></i>
+                        UMAP Projection
+                    </h4>
+                    <p class="text-muted mb-0">2D visualization of high-dimensional embeddings</p>
+                </div>
+                <div class="card-body">
+                    <div id="umap-container">
+                        <div id="umap-placeholder" class="d-flex justify-content-center align-items-center glass-effect rounded umap-container">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary mb-2" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <div class="text-muted">Initializing UMAP visualization...</div>
+                                <small class="text-muted">This process runs in the background</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Visualization Call-to-Action -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card animate-fade-in border-0 shadow-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="card-body text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-cube text-white" style="font-size: 4rem;"></i>
+                    </div>
+                    <h3 class="text-white fw-bold mb-3">Explore in 3D Space</h3>
+                    <p class="text-white opacity-90 mb-4 lead">
+                        Interactive 3D visualization with clickable points for similarity search.<br>
+                        Discover patterns and relationships in your vector embeddings.
+                    </p>
+                    <div class="mb-4">
+                        <div class="row text-center">
+                            <div class="col-md-4">
+                                <div class="text-white mb-2">
+                                    <i class="fas fa-mouse-pointer fs-2"></i>
+                                </div>
+                                <small class="text-white opacity-75">Click & Explore</small>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-white mb-2">
+                                    <i class="fas fa-search fs-2"></i>
+                                </div>
+                                <small class="text-white opacity-75">Find Similar Vectors</small>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-white mb-2">
+                                    <i class="fas fa-palette fs-2"></i>
+                                </div>
+                                <small class="text-white opacity-75">Color-coded Types</small>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('vectors_3d') }}" class="btn btn-light btn-lg px-5 py-3 fw-bold">
+                        <i class="fas fa-rocket me-2"></i>
+                        Launch 3D Visualization
+                    </a>
+                    <div class="mt-3">
+                        <small class="text-white opacity-75">
+                            <i class="fas fa-chart-bar me-1"></i>
+                            {{ vectors|length }} vectors • {{ cancer_counts|length }} cancer types
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="row py-4">
+        <div class="col-12">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <div>
+                        <h4 class="card-title mb-1">
+                            <i class="fas fa-table text-info me-2"></i>
+                            Vector Dataset
+                        </h4>
+                        <p class="text-muted mb-0">Complete view of stored vectors and metadata</p>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive data-table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-hover table-sm align-middle mb-0">
+                            <thead class="sticky-top">
+                            <tr>
+                                <th class="px-4 py-3 bg-primary text-white">
+                                    <i class="fas fa-hashtag me-1"></i>ID
+                                </th>
+                                <th class="py-3 bg-primary text-white">
+                                    <i class="fas fa-file-text me-1"></i>Document
+                                </th>
+                                <th class="py-3 bg-primary text-white">
+                                    <i class="fas fa-tags me-1"></i>Metadata
+                                </th>
+                                <th class="py-3 bg-primary text-white">
+                                    <i class="fas fa-vector-square me-1"></i>Embedding (preview)
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for vector in vectors %}
+                            <tr class="border-bottom">
+                                <td class="px-4 py-3">
+                                    <span class="badge bg-primary">{{ vector.id }}</span>
+                                </td>
+                                <td class="py-3">
+                                    <div class="text-truncate text-truncate-250" title="{{ vector.document or 'No document' }}">
+                                        {% if vector.document %}
+                                            <i class="fas fa-file-text text-muted me-1"></i>{{ vector.document }}
+                                        {% else %}
+                                            <span class="text-muted">
+                                                <i class="fas fa-minus me-1"></i>No document
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="py-3">
+                                    {% if vector.metadata %}
+                                    <div class="glass-effect p-2 rounded metadata-container">
+                                        <pre class="mb-0 small text-muted text-wrap">{{ vector.metadata | tojson(indent=2) }}</pre>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted">
+                                        <i class="fas fa-minus me-1"></i>No metadata
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3">
+                                    <div class="d-flex align-items-center">
+                                        <code class="small bg-light p-1 rounded me-2">
+                                            [{{ vector.embedding[:3] | join(', ') }}...]
+                                        </code>
+                                        <span class="badge bg-secondary small">
+                                            {{ vector.embedding | length }}D
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-0">
+                    <div class="row align-items-center">
+                        <div class="col-sm-6">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Showing {{ vectors|length }} vectors in current collection
+                            </small>
+                        </div>
+                        <div class="col-sm-6 text-sm-end">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                Data updated in real-time
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -55,7 +408,12 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Chart.js for 2D charts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Custom JavaScript modules -->
 <script src="{{ url_for('static', filename='js/chart_loader.js') }}"></script>
 <script src="{{ url_for('static', filename='js/umap_loader.js') }}"></script>
+<script src="{{ url_for('static', filename='js/upload_handler.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vector_search.js') }}"></script>
 {% endblock %}

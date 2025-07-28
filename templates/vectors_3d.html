@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}3D Vector Visualization - Vector Research Platform{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/vectors_3d.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="research-badge">
+                    <i class="fas fa-cube me-1"></i>
+                    3D Visualization
+                </div>
+                <h1 class="display-4 fw-bold mb-3">Interactive 3D Vector Space</h1>
+                <p class="lead opacity-90">
+                    Explore your vector embeddings in an interactive 3D environment. 
+                    Rotate, zoom, and click on points to discover patterns and find similar vectors.
+                </p>
+                <div class="mt-4">
+                    <a href="{{ url_for('browse_vectors') }}" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Browse
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="stats-card">
+                    <h6 class="fw-bold mb-3">
+                        <i class="fas fa-chart-bar me-2"></i>Statistics
+                    </h6>
+                    <div class="row text-center">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="opacity-90">Total Vectors:</span>
+                                <span class="fw-bold fs-5" id="total-vectors-hero">{{ vectors|length }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="opacity-90">Cancer Types:</span>
+                                <span class="fw-bold fs-5" id="cancer-types-count-hero">{{ cancer_counts|length }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="opacity-90">Dimensions:</span>
+                                <span class="fw-bold fs-5">3D Projection</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-container">
+    <div class="container">
+        <!-- 3D Visualization Section -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card animate-fade-in border-0 shadow-sm">
+                    <div class="card-header bg-primary text-white border-0">
+                        <h4 class="card-title mb-1">
+                            <i class="fas fa-cube me-2"></i>
+                            3D Vector Space Explorer
+                        </h4>
+                        <p class="mb-0 opacity-90">Interactive visualization of high-dimensional vector embeddings</p>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="visualization-section">
+                            <!-- Main 3D Visualization Container -->
+                            <div class="vector-3d-fullscreen">
+                                <div id="vector-3d-container" class="vector-3d-container">
+                                    <!-- Loading Placeholder -->
+                                    <div id="vector-3d-placeholder" class="vector-3d-placeholder-full d-flex justify-content-center align-items-center">
+                                        <div class="text-center text-white">
+                                            <div class="spinner-border text-white mb-3" role="status" style="width: 3rem; height: 3rem;">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <h4 class="mb-2">Loading 3D Vector Space</h4>
+                                            <p class="mb-0">Preparing interactive visualization...</p>
+                                            <small class="opacity-75">This may take a moment for large datasets</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Similar Vectors Section -->
+        <div id="similar-vectors-section" class="results-section-fullscreen" style="display: none;">
+            <div class="container">
+                <div class="text-center mb-4">
+                    <h2 class="fw-bold mb-2">
+                        <i class="fas fa-search text-success me-3"></i>
+                        Similar Vectors Results
+                    </h2>
+                    <p id="similar-vectors-query-info" class="lead text-muted">Finding vectors similar to selected point...</p>
+                </div>
+                <div id="similar-vectors-loading" class="text-center py-5" style="display: none;">
+                    <div class="spinner-border text-success mb-3" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h5 class="text-muted">Searching for similar vectors...</h5>
+                    <p class="text-muted">Analyzing vector similarities using cosine distance</p>
+                </div>
+                <div id="similar-vectors-results" class="row">
+                    <!-- Results will be dynamically populated here -->
+                </div>
+                <div id="similar-vectors-error" class="alert alert-danger d-flex align-items-center d-none" style="display: none !important;">
+                    <i class="fas fa-exclamation-triangle me-3 fs-4"></i>
+                    <div>
+                        <h6 class="mb-1">Error Loading Results</h6>
+                        <span class="error-message">Unable to find similar vectors</span>
+                    </div>
+                </div>
+                <div class="text-center mt-4 py-4">
+                    <button class="btn btn-outline-primary" onclick="window.vector3DVisualizer?.hideSearchResults()">
+                        <i class="fas fa-arrow-up me-2"></i>Back to 3D View
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Three.js & Custom -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
+<script src="{{ url_for('static', filename='js/vector_3d.js') }}"></script>
+{% endblock %}

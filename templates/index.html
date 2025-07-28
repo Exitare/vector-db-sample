@@ -1,78 +1,405 @@
 {% extends "base.html" %}
 
-{% block title %}Vector Database Interface{% endblock %}
+{% block title %}Vector Research Platform - Dashboard{% endblock %}
 
 {% block content %}
 
-<!-- Switch Collection Form -->
-<div class="d-flex justify-content-between align-items-center mt-3">
-    <h2>Current Collection: <span class="text-primary">{{ current_collection }}</span></h2>
-    <a href="/create-collection" class="btn btn-outline-primary">
-        <i class="fas fa-plus-circle me-1"></i> New Collection
-    </a>
+<!-- Hero Section -->
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="research-badge">
+                    <i class="fas fa-microscope me-1"></i>
+                    Multimodal Cancer Research
+                </div>
+                <h1 class="display-4 fw-bold mb-3">Vector Database Explorer</h1>
+                <p class="lead opacity-90">
+                    Advanced exploration platform for multimodal cancer data through vector embeddings. 
+                    Investigate how aggregated unaligned embedding spaces maintain tumor of origin signals.
+                </p>
+                <div class="mt-4">
+                    <a href="/browse-vectors" class="btn btn-success btn-lg me-3">
+                        <i class="fas fa-chart-scatter me-2"></i>Explore Data
+                    </a>
+                    <a href="/create-collection" class="btn btn-warning btn-lg">
+                        <i class="fas fa-plus-circle me-2"></i>New Collection
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="stats-card">
+                    <h3 class="fw-bold mb-1">{{ current_collection }}</h3>
+                    <p class="mb-2 opacity-90">Active Collection</p>
+                    
+                    {% if current_collection_metadata %}
+                    <div class="collection-metadata mt-2">
+                        {% if current_collection_metadata.version %}
+                        <div class="badge bg-primary bg-opacity-75 me-1 mb-1">
+                            <i class="fas fa-code-branch me-1"></i>{{ current_collection_metadata.version }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if current_collection_metadata.source %}
+                        <div class="badge bg-info bg-opacity-75 me-1 mb-1">
+                            <i class="fas fa-database me-1"></i>{{ current_collection_metadata.source }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if current_collection_metadata.created_by %}
+                        <div class="badge bg-success bg-opacity-75 me-1 mb-1">
+                            <i class="fas fa-user me-1"></i>{{ current_collection_metadata.created_by }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if current_collection_metadata.description %}
+                        <div class="small text-light opacity-75 mt-2">
+                            {{ current_collection_metadata.description[:60] }}{% if current_collection_metadata.description|length > 60 %}...{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-<form action="/set-collection" method="post" class="card p-4 shadow-sm mb-4 mt-3">
-    <div class="mb-3">
-        <label for="collection_name" class="form-label">Select Collection</label>
-        <select class="form-select" id="collection_name" name="collection_name" required>
-            {% for name in collections %}
-            <option value="{{ name }}" {% if name == current_collection %}selected{% endif %}>{{ name }}</option>
-            {% endfor %}
-        </select>
+
+<div class="container">
+    <!-- Collection Management Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="card-title mb-1">
+                                <i class="fas fa-database text-primary me-2"></i>
+                                Collection Management
+                            </h4>
+                            <p class="text-muted mb-0">Switch between collections or create new ones</p>
+                        </div>
+                        <a href="/create-collection" class="btn btn-outline-primary">
+                            <i class="fas fa-plus-circle me-1"></i> New Collection
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form action="/set-collection" method="post" class="row align-items-end">
+                        <div class="col-md-8">
+                            <label for="collection_name" class="form-label fw-semibold">Select Collection</label>
+                            <select class="form-select" id="collection_name" name="collection_name" required>
+                                {% for col_info in collections_info %}
+                                <option value="{{ col_info.name }}" {% if col_info.name == current_collection %}selected{% endif %}>
+                                    {{ col_info.name }}
+                                    {% if col_info.metadata %}
+                                        {% if col_info.metadata.version %} (v{{ col_info.metadata.version }}){% endif %}
+                                        {% if col_info.metadata.source %} - {{ col_info.metadata.source }}{% endif %}
+                                    {% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% if collections_info and current_collection_metadata %}
+                            <div class="form-text mt-2">
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% if current_collection_metadata.created_by %}
+                                    <span class="badge bg-light text-dark">
+                                        <i class="fas fa-user me-1"></i>{{ current_collection_metadata.created_by }}
+                                    </span>
+                                    {% endif %}
+                                    {% if current_collection_metadata.created_at %}
+                                    <span class="badge bg-light text-dark">
+                                        <i class="fas fa-calendar me-1"></i>{{ current_collection_metadata.created_at[:10] }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                {% if current_collection_metadata.description %}
+                                <div class="small text-muted mt-1">{{ current_collection_metadata.description }}</div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-exchange-alt me-1"></i>Switch Collection
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
-    <button type="submit" class="btn btn-primary">Switch Collection</button>
-</form>
 
-<!-- Upload CSV/HDF5 Form -->
-<h3 class="mb-4">Upload CSV or HDF5 to Add Vectors</h3>
-<form action="/upload-data" method="post" enctype="multipart/form-data" class="card p-4 shadow-sm mb-4">
-    <div class="mb-3">
-        <label for="data_file" class="form-label">Select File</label>
-        <input class="form-control" type="file" id="data_file" name="data_file" accept=".csv,.h5,.hdf5" required>
+    <!-- Research Overview Section -->
+    <div class="row mb-5">
+        <div class="col-lg-6 mb-4">
+            <div class="card animate-fade-in h-100">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-dna text-primary me-2"></i>
+                        Research Foundation
+                    </h4>
+                    <p class="text-muted mb-0">Understanding multimodal cancer data through vector embeddings</p>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">
+                        This platform is based on groundbreaking research demonstrating that 
+                        <strong>Embeddings from unaligned latent spaces can encode complex biological data</strong> into 
+                        low-dimensional spaces while maintaining relationships between entities.
+                    </p>
+                    <div class="research-highlight mb-3">
+                        <h6 class="fw-semibold text-success">
+                            <i class="fas fa-lightbulb me-1"></i>Key Discovery
+                        </h6>
+                        <p class="small">
+                            Signal from unaligned embedded values is conserved and can still be used for 
+                            learning tasks, such as data modality and tumor of origin recognition.
+                        </p>
+                    </div>
+                    <a href="https://www.biorxiv.org/content/10.1101/2025.05.14.653900v1" 
+                       target="_blank" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-external-link-alt me-1"></i>Read Full Paper
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-4">
+            <div class="card animate-fade-in h-100">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-project-diagram text-info me-2"></i>
+                        Vector Embeddings Explained
+                    </h4>
+                    <p class="text-muted mb-0">How high-dimensional data becomes explorable</p>
+                </div>
+                <div class="card-body">
+                    <div class="embedding-explanation">
+                        <div class="step-item mb-3">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h6 class="fw-semibold">Data Transformation</h6>
+                                <p class="small text-muted">Complex biological data (genes, proteins, images) 
+                                is converted into numerical vectors that capture essential features.</p>
+                            </div>
+                        </div>
+                        <div class="step-item mb-3">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h6 class="fw-semibold">Relationship Preservation</h6>
+                                <p class="small text-muted">Similar biological entities end up close 
+                                together in the vector space, maintaining meaningful relationships.</p>
+                            </div>
+                        </div>
+                        <div class="step-item mb-3">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h6 class="fw-semibold">Analysis & Discovery</h6>
+                                <p class="small text-muted">Vector similarity searches reveal patterns, 
+                                clusters, and connections invisible in raw data.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    <button type="submit" class="btn btn-secondary">Upload File</button>
-</form>
 
-<!-- Search Form -->
-<h3 class="mt-5 mb-4">Search Similar Vectors</h3>
-<form action="/search-vector" method="post" class="card p-4 shadow-sm mb-4">
-    <div class="mb-3">
-        <label for="query_vector" class="form-label">Search Vector (comma-separated)</label>
-        <input type="text" class="form-control" id="query_vector" name="query_vector"
-               placeholder="e.g. 0.1,0.2,0.3,0.4" required>
+    <!-- Research Applications Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-flask text-warning me-2"></i>
+                        Research Applications & Use Cases
+                    </h4>
+                    <p class="text-muted mb-0">Practical applications of multimodal vector embedding analysis</p>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-4">
+                            <div class="application-card glass-effect p-3 h-100">
+                                <div class="app-icon mb-3">
+                                    <i class="fas fa-search-plus fa-2x text-primary"></i>
+                                </div>
+                                <h6 class="fw-semibold">Tumor Classification</h6>
+                                <p class="small text-muted">
+                                    Identify tumor of origin by analyzing aggregated embeddings from 
+                                    multiple data modalities (genomics, pathology, clinical data).
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <div class="application-card glass-effect p-3 h-100">
+                                <div class="app-icon mb-3">
+                                    <i class="fas fa-layer-group fa-2x text-success"></i>
+                                </div>
+                                <h6 class="fw-semibold">Multimodal Integration</h6>
+                                <p class="small text-muted">
+                                    Combine unaligned embedding spaces from different data types 
+                                    without losing critical biological signals.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <div class="application-card glass-effect p-3 h-100">
+                                <div class="app-icon mb-3">
+                                    <i class="fas fa-chart-line fa-2x text-info"></i>
+                                </div>
+                                <h6 class="fw-semibold">Pattern Discovery</h6>
+                                <p class="small text-muted">
+                                    Uncover hidden patterns and relationships in high-dimensional 
+                                    biological data through vector similarity analysis.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    <button type="submit" class="btn btn-success">Search</button>
-</form>
 
-<!-- Search Results -->
-{% if results %}
-<h4 class="mt-4">Search Results</h4>
-<table class="table table-bordered table-striped mt-3">
-    <thead>
-    <tr>
-        <th>ID</th>
-        <th>Document</th>
-        <th>Metadata</th>
-        <th>Distance</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for result in results %}
-    <tr>
-        <td>{{ result.id }}</td>
-        <td>{{ result.document }}</td>
-        <td>
-            {% if result.metadata %}
-            <pre class="mb-0">{{ result.metadata | tojson(indent=0) }}</pre>
-            {% else %}
-            &mdash;
-            {% endif %}
-        </td>
-        <td>{{ "%.4f"|format(result.distance) }}</td>
-    </tr>
-    {% endfor %}
-    </tbody>
-</table>
-{% endif %}
+    <!-- Getting Started Section -->
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto">
+            <div class="card animate-fade-in text-center">
+                <div class="card-body py-5">
+                    <h3 class="fw-bold mb-4">Ready to Explore Your Data?</h3>
+                    <p class="lead text-muted mb-4">
+                        Start by creating a collection or exploring existing datasets to discover 
+                        the power of vector-based biological data analysis.
+                    </p>
+                    <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
+                        <a href="/create-collection" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus-circle me-2"></i>Create New Collection
+                        </a>
+                        {% if current_collection %}
+                        <a href="/browse-vectors" class="btn btn-outline-primary btn-lg">
+                            <i class="fas fa-chart-scatter me-2"></i>Explore {{ current_collection }}
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Technical Features Section -->
+    <div class="row py-5">
+        <div class="col-12">
+            <div class="card animate-fade-in">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h4 class="card-title mb-1">
+                        <i class="fas fa-cogs text-secondary me-2"></i>
+                        Platform Capabilities
+                    </h4>
+                    <p class="text-muted mb-0">Advanced features for vector database exploration</p>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="feature-item">
+                                <i class="fas fa-vector-square text-primary mb-2"></i>
+                                <h6 class="fw-semibold">Vector Search</h6>
+                                <p class="small text-muted">High-performance similarity search across high-dimensional embeddings</p>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="feature-item">
+                                <i class="fas fa-chart-scatter text-success mb-2"></i>
+                                <h6 class="fw-semibold">UMAP Visualization</h6>
+                                <p class="small text-muted">Interactive 2D projections of high-dimensional vector spaces</p>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="feature-item">
+                                <i class="fas fa-database text-info mb-2"></i>
+                                <h6 class="fw-semibold">ChromaDB Storage</h6>
+                                <p class="small text-muted">Efficient vector database with metadata support</p>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6 mb-3">
+                            <div class="feature-item">
+                                <i class="fas fa-tags text-warning mb-2"></i>
+                                <h6 class="fw-semibold">Rich Metadata</h6>
+                                <p class="small text-muted">Comprehensive annotation and categorization system</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.research-highlight {
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(40, 167, 69, 0.05));
+    border-left: 4px solid #28a745;
+    padding: 1rem;
+    border-radius: 0.375rem;
+}
+
+.embedding-explanation .step-item {
+    display: flex;
+    align-items: flex-start;
+}
+
+.step-number {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.875rem;
+    margin-right: 1rem;
+    flex-shrink: 0;
+}
+
+.step-content h6 {
+    margin-bottom: 0.25rem;
+}
+
+.application-card {
+    border-radius: 0.75rem;
+    transition: transform 0.2s ease;
+}
+
+.application-card:hover {
+    transform: translateY(-2px);
+}
+
+.app-icon {
+    text-align: center;
+}
+
+.feature-item {
+    text-align: center;
+    padding: 1rem;
+}
+
+.feature-item i {
+    font-size: 2rem;
+    display: block;
+}</style>
+
+    </div>
+
+    {% if results %}
+    <!-- This section is now handled by JavaScript -->
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Index page now focuses on research exploration only
+// Search functionality has been moved to the browse page
+</script>
 {% endblock %}
