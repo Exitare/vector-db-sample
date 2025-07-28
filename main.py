@@ -583,73 +583,72 @@ async def vectors_3d():
 
 
 def generate_umap_sync(embeddings, metadatas):
-    """Generate UMAP embeddings synchronously with metrics tracking"""
-    start_time = time.time()
-    
+    """Synchronous UMAP generation function to run in thread pool"""
     try:
-        # Default parameters
-        n_neighbors = min(15, len(embeddings) - 1) if len(embeddings) > 1 else 1
-        min_dist = 0.1
+        # Set matplotlib to use non-interactive backend for thread safety
+        import matplotlib
+        matplotlib.use('Agg')  # Use non-GUI backend
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        import numpy as np
         
-        # Convert to numpy array if needed
-        if not isinstance(embeddings, np.ndarray):
-            embeddings = np.array(embeddings)
+        # Validate input safely (avoid boolean evaluation on arrays)
+        if embeddings is None or len(embeddings) == 0:
+            return {"success": False, "error": "No embeddings provided"}
         
         if len(embeddings) < 2:
-            return {"success": False, "error": "Need at least 2 vectors for UMAP"}
+            return {"success": False, "error": "Need at least 2 vectors for UMAP projection"}
+
+        # Extract cancer types (using your exact working logic)
+        cancer_types = []
+        for meta in metadatas:
+            y = meta.get("y", "Unknown") if meta else "Unknown"
+            if isinstance(y, bytes):
+                y = y.decode()
+            cancer_types.append(str(y))
+
+        unique_labels = sorted(set(cancer_types))
+        color_list = list(mcolors.TABLEAU_COLORS.values()) + list(mcolors.CSS4_COLORS.values())
+        label_colors = {label: color_list[i % len(color_list)] for i, label in enumerate(unique_labels)}
+        point_colors = [label_colors[label] for label in cancer_types]
+
+        # UMAP projection (using your exact working parameters)
+        reducer = umap.UMAP(n_components=2, random_state=42)
+        reduced = reducer.fit_transform(embeddings)
+
+        # Plot (using your exact working approach but with larger size)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        scatter = ax.scatter(reduced[:, 0], reduced[:, 1], c=point_colors, alpha=0.7)
+        ax.set_title("UMAP Projection of Embeddings", fontsize=14, fontweight='bold')
+        ax.set_xlabel("UMAP 1")
+        ax.set_ylabel("UMAP 2")
+
+        # Legend (using your exact working legend code)
+        handles = [
+            plt.Line2D([0], [0], marker='o', color='w',
+                       label=label, markersize=7,
+                       markerfacecolor=label_colors[label])
+            for label in unique_labels
+        ]
+        ax.legend(handles=handles, title="Cancer Types", bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        # Save plot to base64 (with higher DPI for better quality)
+        buf = io.BytesIO()
+        plt.tight_layout()
+        fig.savefig(buf, format="png", dpi=200, bbox_inches='tight', facecolor='white')
+        buf.seek(0)
+        img_base64 = base64.b64encode(buf.read()).decode("utf-8")
         
-        # Generate UMAP with 2D output
-        reducer = umap.UMAP(
-            n_neighbors=n_neighbors,
-            min_dist=min_dist,
-            n_components=2,
-            random_state=42,
-            verbose=False
-        )
-        
-        umap_result = reducer.fit_transform(embeddings)
-        
-        # Format response
-        points = []
-        for i, (coord, metadata) in enumerate(zip(umap_result, metadatas)):
-            points.append({
-                "x": float(coord[0]),
-                "y": float(coord[1]),
-                "metadata": metadata
-            })
-        
-        # Record successful UMAP generation
-        duration = time.time() - start_time
-        UMAP_GENERATION_DURATION.observe(duration)
-        
-        return {"success": True, "points": points}
-        
+        # Clean up
+        plt.close(fig)
+
+        return {"success": True, "image": img_base64}
+
     except Exception as e:
-        # Record UMAP generation error
-        duration = time.time() - start_time
-        UMAP_GENERATION_DURATION.observe(duration)
-        API_ERRORS.labels(endpoint='generate-umap', error_type=type(e).__name__).inc()
-        
-        print(f"UMAP Error: {e}")
-        import traceback
-        traceback.print_exc()
+        # Make sure to clean up matplotlib resources even on error
         try:
-            # Fallback with simpler parameters
-            reducer = umap.UMAP(n_neighbors=2, min_dist=0.5, n_components=2, random_state=42)
-            umap_result = reducer.fit_transform(embeddings)
-            points = []
-            for i, (coord, metadata) in enumerate(zip(umap_result, metadatas)):
-                points.append({
-                    "x": float(coord[0]),
-                    "y": float(coord[1]),
-                    "metadata": metadata
-                })
-            
-            # Record successful fallback UMAP generation
-            duration = time.time() - start_time
-            UMAP_GENERATION_DURATION.observe(duration)
-            
-            return {"success": True, "points": points}
+            plt.close('all')
+            plt.clf()
         except:
             pass
         return {"success": False, "error": f"UMAP generation failed: {str(e)}"}
