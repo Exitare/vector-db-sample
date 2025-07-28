@@ -522,6 +522,11 @@ class Vector3DVisualizer {
                 const pointData = intersectedMesh.userData.pointData;
                 
                 console.log('🎯 Point clicked:', pointData.id);
+                
+                // Hide any existing tooltip before showing a new one
+                this.hideTooltip();
+                
+                // Show the new tooltip
                 this.showPointInfo(pointData, event);
             } else {
                 // Hide tooltip if clicking on empty space
@@ -693,11 +698,14 @@ class Vector3DVisualizer {
             console.log('✅ Direct button event listener added');
         }
         
-        // Disable canvas pointer events while tooltip is visible to allow button interaction
-        if (this.renderer && this.renderer.domElement) {
-            this.renderer.domElement.style.pointerEvents = 'none';
-            console.log('🎯 Disabled canvas pointer events for tooltip interaction');
-        }
+        // Re-enable canvas pointer events immediately after tooltip is positioned
+        // This allows users to click on other points without first hiding the tooltip
+        setTimeout(() => {
+            if (this.renderer && this.renderer.domElement) {
+                this.renderer.domElement.style.pointerEvents = 'auto';
+                console.log('🎯 Re-enabled canvas pointer events for continued interaction');
+            }
+        }, 100);
         
         // Clear any existing timeout
         if (this.tooltipTimeout) {
@@ -720,7 +728,7 @@ class Vector3DVisualizer {
             this.tooltipTimeout = null;
         }
         
-        // Re-enable canvas pointer events when tooltip is hidden
+        // Ensure canvas pointer events are always enabled when tooltip is hidden
         if (this.renderer && this.renderer.domElement) {
             this.renderer.domElement.style.pointerEvents = 'auto';
             console.log('🎯 Re-enabled canvas pointer events after hiding tooltip');
