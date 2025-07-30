@@ -1,4 +1,4 @@
-name: Deploy PhDTracker App Production
+name: Deploy Vector DB Application
 
 on:
   push:
@@ -21,11 +21,6 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ${{ secrets.APP_DIRECTORY }}"
           rsync -avz -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa" ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.APP_DIRECTORY }}/
 
-      - name: Create .env file
-        run: |
-          echo "GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GF_ADMIN_PASSWORD }}" >> .env
-          echo "GF_SECURITY_ADMIN_USER=${{ secrets.GF_ADMIN_USER }}" >> .env
-
       - name: Deploy using Docker Compose
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -34,6 +29,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ${{ secrets.APP_DIRECTORY }}
+
+            echo "GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GF_ADMIN_PASSWORD }}" >> .env
+            echo "GF_SECURITY_ADMIN_USER=${{ secrets.GF_ADMIN_USER }}" >> .env
 
             echo "Shutting down existing containers..."
             docker-compose down --remove-orphans
