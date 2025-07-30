@@ -1,6 +1,7 @@
 pandas
 chromadb
 quart
+quart-auth
 hypercorn
 prometheus-client
 h5py

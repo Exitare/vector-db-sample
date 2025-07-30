@@ -1,4 +1,5 @@
-from quart import Quart, render_template, request, redirect, url_for, flash, jsonify, Response
+from quart import Quart, render_template, request, redirect, url_for, flash, jsonify, Response, session
+from quart_auth import AuthUser, login_user, logout_user, login_required, current_user, QuartAuth
 import chromadb
 import pandas as pd
 import numpy as np
@@ -19,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 import time
 import argparse
+import hashlib
 # Prometheus metrics
 from prometheus_client import Counter as PrometheusCounter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
@@ -68,8 +70,56 @@ PAGE_VIEWS = PrometheusCounter(
 )
 
 app = Quart(__name__)
-app.secret_key = "your-secret-key"
+app.secret_key = "your-secret-key-change-this-in-production"
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB, adjust as needed
+
+# Setup Quart-Auth
+auth_manager = QuartAuth(app)
+
+# Store authenticated users in session for proper retrieval
+authenticated_users = {}
+
+# Make current_user available to all templates with proper user data
+@app.context_processor
+async def inject_user():
+    # Get the current user from quart-auth
+    auth_user = current_user
+    
+    # If user is authenticated, get our custom User object
+    if auth_user.is_authenticated and auth_user.auth_id in authenticated_users:
+        return dict(current_user=authenticated_users[auth_user.auth_id])
+    
+    return dict(current_user=auth_user)
+
+# Simple in-memory user store (in production, use a proper database)
+USERS = {
+    "admin": {
+        "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
+        "role": "admin"
+    },
+    "user": {
+        "password_hash": hashlib.sha256("user123".encode()).hexdigest(),
+        "role": "user"
+    }
+}
+
+class User(AuthUser):
+    def __init__(self, auth_id, username, role):
+        super().__init__(auth_id)
+        self.username = username
+        self.role = role
+        
+    def __repr__(self):
+        return f"User(auth_id={self.auth_id}, username={self.username}, role={self.role})"
+    
+    def __getstate__(self):
+        """Custom serialization to preserve all attributes"""
+        state = self.__dict__.copy()
+        return state
+    
+    def __setstate__(self, state):
+        """Custom deserialization to restore all attributes"""
+        self.__dict__.update(state)
 
 # Thread pool for background tasks
 executor = ThreadPoolExecutor(max_workers=2)
@@ -123,6 +173,45 @@ async def metrics():
     except Exception as e:
         API_ERRORS.labels(endpoint='metrics', error_type=type(e).__name__).inc()
         return Response(f"Error generating metrics: {str(e)}", status=500)
+
+# Authentication routes
+@app.route('/login', methods=['GET', 'POST'])
+async def login():
+    if request.method == 'POST':
+        form = await request.form
+        username = form.get('username', '').strip()
+        password = form.get('password', '').strip()
+        
+        if username in USERS:
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            if USERS[username]['password_hash'] == password_hash:
+                user = User(username, username, USERS[username]['role'])
+                print(user)
+                
+                # Store our custom user object for template access
+                authenticated_users[username] = user
+                
+                # Login with basic AuthUser for quart-auth session management
+                basic_auth_user = AuthUser(username)
+                login_user(basic_auth_user)
+                
+                await flash(f'Welcome, {username}!', 'success')
+                return redirect(url_for('index'))
+        
+        await flash('Invalid username or password', 'danger')
+    
+    return await render_template('login.html')
+
+@app.route('/logout')
+@login_required
+async def logout():
+    # Get current user auth_id before logout
+    if current_user.is_authenticated and current_user.auth_id in authenticated_users:
+        del authenticated_users[current_user.auth_id]
+    
+    logout_user()
+    await flash('You have been logged out', 'info')
+    return redirect(url_for('index'))
 
 
 @app.route('/', methods=['GET'])
@@ -733,6 +822,7 @@ async def umap_status(task_id):
 
 
 @app.route('/create-collection', methods=['POST'])
+@login_required
 async def create_collection():
     form = await request.form
     name = form.get('new_collection_name', '').strip()
@@ -814,6 +904,7 @@ def get_all_collections():
 
 
 @app.route('/create-collection', methods=['GET'])
+@login_required
 async def create_collection_page():
     # Track page view
     user_agent = request.headers.get('User-Agent', 'Unknown')[:50]  # Truncate to avoid high cardinality
