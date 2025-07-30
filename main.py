@@ -21,6 +21,7 @@ from functools import partial
 import time
 import argparse
 import hashlib
+import hmac
 # Prometheus metrics
 from prometheus_client import Counter as PrometheusCounter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
@@ -111,15 +112,7 @@ class User(AuthUser):
         
     def __repr__(self):
         return f"User(auth_id={self.auth_id}, username={self.username}, role={self.role})"
-    
-    def __getstate__(self):
-        """Custom serialization to preserve all attributes"""
-        state = self.__dict__.copy()
-        return state
-    
-    def __setstate__(self, state):
-        """Custom deserialization to restore all attributes"""
-        self.__dict__.update(state)
+
 
 # Thread pool for background tasks
 executor = ThreadPoolExecutor(max_workers=2)
@@ -184,7 +177,10 @@ async def login():
         
         if username in USERS:
             password_hash = hashlib.sha256(password.encode()).hexdigest()
-            if USERS[username]['password_hash'] == password_hash:
+            stored_hash = USERS[username]['password_hash']
+            
+            # Use constant-time comparison to prevent timing attacks
+            if hmac.compare_digest(stored_hash, password_hash):
                 user = User(username, username, USERS[username]['role'])
                 print(user)
                 
